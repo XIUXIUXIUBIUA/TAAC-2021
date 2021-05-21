@@ -23,16 +23,17 @@ class NeXtVLAD(nn.Module):
         # self.cluster_weights = nn.Linear()
         self.bn_1 = nn.BatchNorm1d(self.groups * self.nextvlad_cluster_size)
         self.bn_2 = nn.BatchNorm1d(self.nextvlad_cluster_size * (self.expansion * self.feature_size // self.groups))
-        
+        for name,parameter in self.named_parameters():
+            if(name in ['linear_1','attention_1','cluster_weights','cluster_weights2']):
+                nn.init.kaiming_normal_(parameter)
     def forward(self,input,mask=None):
         # input shape (B,M,N)
         _,seq_len,_ = input.shape
         input = self.linear_1(input) # shape (B,M,lambda*N)
         attention = self.attention_1(input)
-        # print(attention.shape)
         attention  = torch.sigmoid(attention) # shape (B,M,G)
         if mask is not None:
-            attention = torch.mul(input, mask.unsqueeze(-1))
+            attention = torch.mul(attention, mask.unsqueeze(-1))
         attention = torch.reshape(attention,[-1,seq_len*self.groups,1])
         # 分组后（也就是降维）的特征维度
         feature_size_ = self.expansion * self.feature_size // self.groups 

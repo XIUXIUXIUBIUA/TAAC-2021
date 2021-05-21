@@ -1,4 +1,5 @@
 import src.video_head as video_head
+import src.text_head as text_head
 import src.fusion_head as fusion_head
 import src.classcify_head as classcify_head
 import torch.nn as nn
@@ -59,10 +60,13 @@ class Baseline(nn.Module):
             else:
                 raise NotImplementedError
         
+        '''
         print('initialization: xavier')
         for p in self.parameters():
             if p.dim() > 1:
-                nn.init.xavier_uniform_(p)
+                nn.init.xavier_normal_(p)
+        '''
+        print('initialization: Kaiming')
     def forward(self,inputs_dict):
         batch_size,_,_ = inputs_dict['video'].shape
         prob_dict = {}
@@ -70,9 +74,10 @@ class Baseline(nn.Module):
         # 每个模态分别表征
         for modal_name in self.modal_name_list:    
             #Modal Dropout
+            mask = None
             if modal_name in ['video', 'audio']:
                 drop_shape = [batch_size, 1, 1]
-                # mask = tf.sequence_mask(inputs_dict[modal_name+'_frames_num'], self.video_max_frame, dtype=tf.float32)   
+                mask = (inputs_dict[modal_name] != 0).type(torch.float32).sum(dim=-1).type(torch.bool)
             elif modal_name == 'text': 
                 drop_shape = [batch_size, 1]
             elif modal_name == 'image': 
@@ -80,14 +85,17 @@ class Baseline(nn.Module):
             if self.training and self.use_modal_drop:
                 inputs_dict[modal_name], prob_dict[modal_name+'_loss_weight'] = self._modal_drop(inputs_dict[modal_name], self.modal_drop_rate, drop_shape)
             if modal_name in ['video', 'audio']:
-                # mafp: video和audio就需要mask，mask了什么？
-                embedding = self.head_dict[modal_name](inputs_dict[modal_name], mask=None)
+                embedding = self.head_dict[modal_name](inputs_dict[modal_name], mask=mask)
+            elif modal_name == 'text':
+                embedding =  self.head_dict[modal_name](inputs_dict[modal_name],inputs_dict['attention_mask'])
             else:
-                # mafp: 如果是text则要设置是否 training bert
                 embedding =  self.head_dict[modal_name](inputs_dict[modal_name])
             if self.with_embedding_bn:
                 #embedding = self.bn(embedding)
                 pass
+            #if(modal_name == 'text'):
+            #    encode_emb = embedding
+            #else:
             encode_emb = self.fusion_head_dict[modal_name]([embedding])
             prob_dict['tagging_output_'+modal_name] = self.classifier_dict[modal_name](encode_emb)
             embedding_list.append(embedding)
