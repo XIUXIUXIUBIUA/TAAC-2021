@@ -68,7 +68,7 @@ class Baseline(nn.Module):
         '''
         print('initialization: Kaiming')
     def forward(self,inputs_dict):
-        batch_size,_,_ = inputs_dict['video'].shape
+        batch_size = inputs_dict['video'].shape[0]
         prob_dict = {}
         embedding_list = []
         # 每个模态分别表征
@@ -76,8 +76,9 @@ class Baseline(nn.Module):
             #Modal Dropout
             mask = None
             if modal_name in ['video', 'audio']:
-                drop_shape = [batch_size, 1, 1]
-                mask = (inputs_dict[modal_name] != 0).type(torch.float32).sum(dim=-1).type(torch.bool)
+                # drop_shape = [batch_size, 1, 1]
+                drop_shape = [batch_size,1,1,1,1]
+                mask = (inputs_dict[modal_name] != 0).type(torch.float32).sum(dim=-1).sum(dim=-1).sum(dim=-1).type(torch.bool)
             elif modal_name == 'text': 
                 drop_shape = [batch_size, 1]
             elif modal_name == 'image': 

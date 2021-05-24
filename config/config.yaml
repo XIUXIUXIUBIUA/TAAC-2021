@@ -12,7 +12,7 @@ ModelConfig:
   with_image_head: False # False #图片特征
 
   #视频特征(16384)
-  video_head_type: 'NeXtVLAD'
+  video_head_type: 'RawNeXtVLAD' #'NeXtVLAD'
   video_head_params:
     nextvlad_cluster_size: 128
     groups: 16
@@ -32,7 +32,7 @@ ModelConfig:
   #文本特征(1024)
   text_head_type: 'BERT'
   text_head_params:
-    bert_path: '../pretrained/fine_bert'
+    bert_path: '../pretrained/bert'
     # bert_emb_encode_size: 1024
   
   #图片特征(2048)
@@ -99,10 +99,13 @@ OptimizerConfig:
 #    3. DataSet Config
 #############################################################
 DatasetConfig:
-  batch_size: 32
+  batch_size: 4
   shuffle: True
   # train_data_path: '/home/tione/notebook/dataset/tagging/GroundTruth/datafile/train_full.txt'
-  train_data_path: '/home/tione/notebook/dataset/tagging/GroundTruth/datafile/train_full.txt'
+  train_raw_data_path: '/home/tione/notebook/dataset/tagging/GroundTruth/datafile/raw_train_good.txt'
+  val_raw_data_path: '/home/tione/notebook/dataset/tagging/GroundTruth/datafile/raw_val_good.txt'
+  test_raw_data_path: '/home/tione/notebook/dataset/videos/video_5k/test_5k/'
+  train_data_path: '/home/tione/notebook/dataset/tagging/GroundTruth/datafile/train_good.txt'
   val_data_path: '/home/tione/notebook/dataset/tagging/GroundTruth/datafile/val_good.txt'
   test_data_path: '../dataset/videos/video_5k/test_5k/'
   test_feat_path: '../dataset/tagging/tagging_dataset_test_5k/'

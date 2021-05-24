@@ -3,7 +3,8 @@ import torch.nn as nn
 from torch.nn.parameter import Parameter
 from torch.autograd import Variable
 import torch.nn.functional as F
-
+import torchvision.models as models
+import torchvision.models as models
 class NeXtVLAD(nn.Module):
     def __init__(self,feature_size, max_frames, nextvlad_cluster_size, expansion, groups):
         super(NeXtVLAD,self).__init__()
@@ -59,3 +60,23 @@ class NeXtVLAD(nn.Module):
         vlad = torch.reshape(vlad,[-1, self.nextvlad_cluster_size * feature_size_])
         vlad = self.bn_2(vlad)
         return vlad
+
+    
+class RawNeXtVLAD(nn.Module):
+    def __init__(self,feature_size, max_frames, nextvlad_cluster_size, expansion, groups):
+        super(RawNeXtVLAD,self).__init__()
+        self.nextvlad = NeXtVLAD(feature_size, max_frames, nextvlad_cluster_size, expansion, groups)
+        self.resnet50 = models.resnet50(pretrained=True)
+        self.resnet50.fc = nn.Linear(2048,1024)
+        
+    def forward(self,input,mask=None):
+        # 输入图像shape (batch,len,channel,H,W)
+        B,S,C,H,W = input.shape
+        input = input.contiguous().view(B*S,C,H,W)
+        output = self.resnet50(input)
+        output = output.contiguous().view(B,S,-1)
+        if(mask!=None):
+            output = self.nextvlad(output,mask)
+        else:
+            output = self.nextvlad(output)
+        return output

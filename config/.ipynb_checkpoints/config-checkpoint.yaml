@@ -7,12 +7,12 @@ ModelConfig:
   with_embedding_bn: False #对不同模态输入特征进行BN归一化
   modal_drop_rate: 0.3
   with_video_head: True #视频特征
-  with_audio_head: True #音频特征
-  with_text_head: False  #文本特征
+  with_audio_head: False #音频特征
+  with_text_head: True  #文本特征
   with_image_head: False # False #图片特征
 
   #视频特征(16384)
-  video_head_type: 'NeXtVLAD'
+  video_head_type: 'RawNeXtVLAD' #'NeXtVLAD'
   video_head_params:
     nextvlad_cluster_size: 128
     groups: 16
@@ -32,19 +32,8 @@ ModelConfig:
   #文本特征(1024)
   text_head_type: 'BERT'
   text_head_params:
-    bert_config:
-      attention_probs_dropout_prob: 0.1
-      hidden_act: "gelu"
-      hidden_dropout_prob: 0.1
-      hidden_size: 768
-      initializer_range: 0.02
-      intermediate_size: 3072
-      max_position_embeddings: 512
-      num_attention_heads: 12
-      num_hidden_layers: 12
-      type_vocab_size: 2
-      vocab_size: 21128
-    bert_emb_encode_size: 1024
+    bert_path: '../pretrained/bert'
+    # bert_emb_encode_size: 1024
   
   #图片特征(2048)
   image_head_type: 'resnet_v2_50'
@@ -110,13 +99,18 @@ OptimizerConfig:
 #    3. DataSet Config
 #############################################################
 DatasetConfig:
-  batch_size: 32
+  batch_size: 4
   shuffle: True
-  # train_data_path: '/Users/mafp/code/datasets/tagging_dataset_train_5k/mac_train.txt'
+  # train_data_path: '/home/tione/notebook/dataset/tagging/GroundTruth/datafile/train_full.txt'
+  train_raw_data_path: '/home/tione/notebook/dataset/tagging/GroundTruth/datafile/raw_train_good.txt'
+  val_raw_data_path: '/home/tione/notebook/dataset/tagging/GroundTruth/datafile/raw_val_good.txt'
+  test_raw_data_path: '/home/tione/notebook/dataset/videos/video_5k/test_5k/'
   train_data_path: '/home/tione/notebook/dataset/tagging/GroundTruth/datafile/train_good.txt'
   val_data_path: '/home/tione/notebook/dataset/tagging/GroundTruth/datafile/val_good.txt'
-  test_data_path: ''
+  test_data_path: '../dataset/videos/video_5k/test_5k/'
+  test_feat_path: '../dataset/tagging/tagging_dataset_test_5k/'
   vocab_path: '../pretrained/bert/vocab.txt'
   label_id_path: '/home/tione/notebook/dataset/label_id.txt'
-  # label_id_path: '/Users/mafp/code/datasets/tagging_dataset_train_5k/label_id.txt'
+  bert_path: '../pretrained/bert'
+  text_max_len: 256
   device: 'cuda'

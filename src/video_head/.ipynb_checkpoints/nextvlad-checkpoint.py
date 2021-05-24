@@ -3,7 +3,8 @@ import torch.nn as nn
 from torch.nn.parameter import Parameter
 from torch.autograd import Variable
 import torch.nn.functional as F
-
+import torchvision.models as models
+import torchvision.models as models
 class NeXtVLAD(nn.Module):
     def __init__(self,feature_size, max_frames, nextvlad_cluster_size, expansion, groups):
         super(NeXtVLAD,self).__init__()
@@ -23,16 +24,17 @@ class NeXtVLAD(nn.Module):
         # self.cluster_weights = nn.Linear()
         self.bn_1 = nn.BatchNorm1d(self.groups * self.nextvlad_cluster_size)
         self.bn_2 = nn.BatchNorm1d(self.nextvlad_cluster_size * (self.expansion * self.feature_size // self.groups))
-        
+        for name,parameter in self.named_parameters():
+            if(name in ['linear_1','attention_1','cluster_weights','cluster_weights2']):
+                nn.init.kaiming_normal_(parameter)
     def forward(self,input,mask=None):
         # input shape (B,M,N)
         _,seq_len,_ = input.shape
         input = self.linear_1(input) # shape (B,M,lambda*N)
         attention = self.attention_1(input)
-        # print(attention.shape)
         attention  = torch.sigmoid(attention) # shape (B,M,G)
         if mask is not None:
-            attention = torch.mul(input, mask.unsqueeze(-1))
+            attention = torch.mul(attention, mask.unsqueeze(-1))
         attention = torch.reshape(attention,[-1,seq_len*self.groups,1])
         # 分组后（也就是降维）的特征维度
         feature_size_ = self.expansion * self.feature_size // self.groups 
@@ -58,3 +60,23 @@ class NeXtVLAD(nn.Module):
         vlad = torch.reshape(vlad,[-1, self.nextvlad_cluster_size * feature_size_])
         vlad = self.bn_2(vlad)
         return vlad
+
+    
+class RawNeXtVLAD(nn.Module):
+    def __init__(self,feature_size, max_frames, nextvlad_cluster_size, expansion, groups):
+        super(RawNeXtVLAD,self).__init__()
+        self.nextvlad = NeXtVLAD(feature_size, max_frames, nextvlad_cluster_size, expansion, groups)
+        self.resnet50 = models.resnet50(pretrained=True)
+        self.resnet50.fc = nn.Linear(2048,1024)
+        
+    def forward(self,input,mask=None):
+        # 输入图像shape (batch,len,channel,H,W)
+        B,S,C,H,W = input.shape
+        input = input.contiguous().view(B*S,C,H,W)
+        output = self.resnet50(input)
+        output = output.contiguous().view(B,S,-1)
+        if(mask!=None):
+            output = self.nextvlad(output,mask)
+        else:
+            output = self.nextvlad(output)
+        return output

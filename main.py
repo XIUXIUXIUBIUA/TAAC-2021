@@ -1,5 +1,6 @@
 import os
 import yaml
+import math
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -58,23 +59,26 @@ if __name__ == '__main__':
     '''
     # model = torch.nn.DataParallel(model,device_ids)
     warm_up_epochs = 5
+    max_num_epochs = 50
     lr_milestones = [20,40,60]
     warm_up_with_multistep_lr = lambda epoch: (epoch+1) / warm_up_epochs if epoch < warm_up_epochs else 0.1**len([m for m in lr_milestones if m <= epoch])
-    lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,lr_lambda=warm_up_with_multistep_lr)
+    warm_up_with_cosine_lr = lambda epoch: (epoch+1) / warm_up_epochs if epoch < warm_up_epochs \
+    else 0.5 * ( math.cos((epoch - warm_up_epochs) /(max_num_epochs - warm_up_epochs) * math.pi) + 1)
+    lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,lr_lambda=warm_up_with_cosine_lr)
     loss_compute = SimpleLossCompute(criterion,optimizer,lr_scheduler)
     best_gap = 0
     # 开始训练epoch
-    epoch_num=100
+    epoch_num=50
     loss_epoch = []
     for epoch in range(epoch_num):
         loss = training_loop(model, train_loader, loss_compute, modal_name_list,train_dataset.device, epoch)
         loss_epoch.append(loss)
-        if(epoch%5==0): # 每20个epoch 验证一次
+        if(epoch%2==0): # 每2个epoch 验证一次
             gap_dict = validating_loop(model,val_loader, loss_compute,modal_name_list,train_dataset.device, epoch)
             print(f'epoch({epoch}): ',gap_dict['fusion'])
             if(gap_dict['fusion']>best_gap):
                 best_gap = gap_dict['fusion']
-                model_name = f'../epoch_{epoch}_{best_gap}.pt'
+                model_name = f'../checkpoint/0524/epoch_{epoch}_{best_gap}.pt'
                 torch.save(model.state_dict(),model_name)
         # break
     # 保存模型
