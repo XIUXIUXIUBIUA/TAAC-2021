@@ -76,8 +76,10 @@ class Baseline(nn.Module):
             #Modal Dropout
             mask = None
             if modal_name in ['video', 'audio']:
-                # drop_shape = [batch_size, 1, 1]
-                drop_shape = [batch_size,1,1,1,1]
+                if(len(inputs_dict['video'].shape)==3):
+                    drop_shape = [batch_size, 1, 1]
+                else:
+                    drop_shape = [batch_size,1,1,1,1]
                 mask = (inputs_dict[modal_name] != 0).type(torch.float32).sum(dim=-1).sum(dim=-1).sum(dim=-1).type(torch.bool)
             elif modal_name == 'text': 
                 drop_shape = [batch_size, 1]

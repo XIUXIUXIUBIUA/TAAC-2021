@@ -6,7 +6,8 @@ import numpy as np
 import utils.train_util as train_util
 import os
 
-def training_loop(model, loader, loss_compute,modal_name_list, device,epoch):
+def training_loop(model, loader, loss_compute,modal_name_list, device,epoch,TBoard):
+    scalars = {'video': 0, 'audio': 0, 'text': 0, 'fusion': 0}
     model.train()
     losses = []
     last_lr = loss_compute.optimizer.param_groups[0]['lr']
@@ -38,18 +39,21 @@ def training_loop(model, loader, loss_compute,modal_name_list, device,epoch):
                 loss_dict[modal] = loss_compute(pred['tagging_output_'+modal]['predictions'],label,pred[modal+'_loss_weight'])
         for key in loss_dict:
             loss += loss_dict[key]
+            scalars[key] += loss_dict[key].item()
         losses.append(loss.item())
         # 反向传播计算梯度
         loss.backward()
+        nn.utils.clip_grad_norm_(model.parameters(),max_norm=1,norm_type=2)
         # 更新网络参数
         loss_compute.optimizer.step()
         if(loss_compute.optimizer.param_groups[0]['lr'] != last_lr):
             last_lr = loss_compute.optimizer.param_groups[0]['lr']
             print(loss_compute.optimizer.param_groups[0]['lr'])
     loss_compute.lr_scheduler.step()
-        
+    for modal in (modal_name_list+['fusion']):
+        TBoard.add_scalar(f'train/{modal}_loss', scalars[modal], epoch)
     return losses
-def validating_loop(model, loader, loss_compute,modal_name_list,device,epoch):
+def validating_loop(model, loader, loss_compute,modal_name_list,device,epoch,TBoard):
     model.eval()
     tagging_class_num = 82
     evl_metrics = [train_util.EvaluationMetrics(tagging_class_num, top_k=20)
@@ -88,6 +92,7 @@ def validating_loop(model, loader, loss_compute,modal_name_list,device,epoch):
     for index,modal_name in enumerate(modal_name_list+['fusion']):
         metric_dict[modal_name] = evl_metrics[index].get()
         gap_dict[modal_name] = metric_dict[modal_name]['gap']
+        TBoard.add_scalar(f'val/{modal_name}_gap', gap_dict[modal_name], epoch)
     return gap_dict
 
 

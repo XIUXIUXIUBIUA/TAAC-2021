@@ -42,11 +42,8 @@ class MultimodaFeaturesDataset(Dataset):
             line = linecache.getline(self.meta_path,line_i)
             line = line.strip('\r\n')
             data_list.append(line)
+        # return data_list[0]
         video,audio,text_ids,text_attention_mask,label_ids = self.preprocess(data_list)
-        #video = video.to(self.device)
-        #audio = audio.to(self.device)
-        #text_ids = text_ids.to(self.device)
-        #label_ids = label_ids.to(self.device)
         return video,audio,text_ids,text_attention_mask,label_ids
     def __len__(self):
         # TODO 不能固定长度

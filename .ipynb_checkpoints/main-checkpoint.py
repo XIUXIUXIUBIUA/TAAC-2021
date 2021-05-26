@@ -11,9 +11,16 @@ from dataloader.dataloader import MultimodaFeaturesDataset
 from src.loss.loss_compute import SimpleLossCompute
 from src.model.baseline_model import Baseline
 from src.loop.run_epoch import training_loop,validating_loop
+from torch.utils import tensorboard as tensorboard
+from datetime import datetime
+
 if __name__ == '__main__':
     # 定义配置文件路径并读入文件
-    torch.multiprocessing.set_start_method('spawn')
+    torch.multiprocessing.set_start_method('spawn',force=True)
+    log_dir = os.path.join('./results/logs/',datetime.now().strftime("%Y%m%d%H%M%S"))
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    TBoard = tensorboard.SummaryWriter(log_dir=log_dir)
     config_path = './config/config.yaml'
     config = yaml.load(open(config_path))
     device_ids = [0]
@@ -36,7 +43,7 @@ if __name__ == '__main__':
     # 定义loss函数和优化器
     criterion = nn.BCELoss(reduction='none')# sum应该没问题吧
     # 不同部件采用不同的学习率
-    
+    '''
     # video+bert
     classifier_params = list(map(id, model.classifier_dict.parameters()))
     bert_params = list(map(id,model.head_dict['text'].parameters()))
@@ -47,8 +54,8 @@ if __name__ == '__main__':
                 {'params': base_params},
                 {'params': model.classifier_dict.parameters(), 'lr': 1e-2},
                 {'params': model.head_dict['text'].parameters(),'lr': 1e-5}],lr=1e-4)
-    
     '''
+    
     # video only
     classifier_params = list(map(id, model.classifier_dict.parameters()))
     base_params = filter(lambda p: id(p) not in (classifier_params),
@@ -56,7 +63,7 @@ if __name__ == '__main__':
     optimizer = torch.optim.Adam([
                 {'params': base_params},
                 {'params': model.classifier_dict.parameters(), 'lr': 1e-2}],lr=1e-4)
-    '''
+    
     # model = torch.nn.DataParallel(model,device_ids)
     warm_up_epochs = 5
     max_num_epochs = 50
@@ -71,15 +78,18 @@ if __name__ == '__main__':
     epoch_num=50
     loss_epoch = []
     for epoch in range(epoch_num):
-        loss = training_loop(model, train_loader, loss_compute, modal_name_list,train_dataset.device, epoch)
+        loss = training_loop(model, train_loader, loss_compute, modal_name_list,train_dataset.device, epoch,TBoard)
         loss_epoch.append(loss)
         if(epoch%2==0): # 每2个epoch 验证一次
-            gap_dict = validating_loop(model,val_loader, loss_compute,modal_name_list,train_dataset.device, epoch)
-            print(f'epoch({epoch}): ',gap_dict['fusion'])
+            gap_dict = validating_loop(model,val_loader, loss_compute,modal_name_list,train_dataset.device, epoch,TBoard)
+            
+            for modal in modal_name_list+['fusion']:
+                print(f'epoch({epoch})({modal}): ',gap_dict[modal])
+                
             if(gap_dict['fusion']>best_gap):
                 best_gap = gap_dict['fusion']
-                model_name = f'../checkpoint/0524/epoch_{epoch}_{best_gap}.pt'
-                torch.save(model.state_dict(),model_name)
+                model_name = f'../checkpoint/0524/01/epoch_{epoch}_{best_gap}.pt'
+                # torch.save(model.state_dict(),model_name)
         # break
     # 保存模型
     
