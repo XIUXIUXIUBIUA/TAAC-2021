@@ -151,6 +151,7 @@ class TestingDataset(Dataset):
         # 1. 从train.txt读取对应 idx 的path
         test_file =  self.test_files[index]
         feat_dict = self.preprocess(test_file,self.feat_path)
+        
         return feat_dict
     def __len__(self):
         # TODO 不能固定长度
@@ -333,3 +334,83 @@ class MultimodaRawDataset(Dataset):
             num_retrieved += 1
 
         return frame_all
+
+class DualDataset(Dataset):
+
+    def __init__(self,dataset_config,job='training'):
+        
+        self.data_num_per_sample = 3 # 在train.txt中每个sample占6行
+        self.text_max_len = dataset_config['text_max_len']
+        self.device = dataset_config['device']
+        self.meta_path = '/home/tione/notebook/dataset/tagging/GroundTruth/datafile/train_test.txt'
+        self.tokenizer = BertTokenizer.from_pretrained(dataset_config['bert_path'])
+        self.label2id = {}
+        with open(dataset_config['label_id_path'],'r') as f:
+            for line in f:
+                line = line.strip('\r\n')
+                line = line.split('\t')
+                self.label2id[line[0]] = int(line[1])
+    def __getitem__(self, index):
+        # 1. 从train.txt读取对应 idx 的path
+        data_list = [] # 存储对于index的各个模态数据的路径和样本标签
+        for line_i in range(self.data_num_per_sample*index+1,self.data_num_per_sample*(index+1)):
+            line = linecache.getline(self.meta_path,line_i)
+            line = line.strip('\r\n')
+            data_list.append(line)
+        video,text_ids,text_attention_mask = self.preprocess(data_list)
+        return video,text_ids,text_attention_mask
+    def __len__(self):
+        # TODO 不能固定长度
+        with open(self.meta_path,'r') as f:
+            lines = f.readlines()
+        return len(lines)//self.data_num_per_sample
+    def preprocess(self,data_list):
+        
+        video_path,text_path = data_list
+        
+        #--------------- video ----------------#
+        video = torch.tensor(np.load(video_path).astype(np.float32))
+            
+        #--------------- text ----------------#
+        text = ''
+        with open(text_path,'r') as f:
+            for line in f:
+                dic = eval(line)
+           
+        for key in dic:
+            dic[key] = ''.join(re.findall('[\u4e00-\u9fa5]',dic[key]))
+            text += dic[key]
+        inputs = self.tokenizer.encode_plus(
+            text,
+            None,
+            add_special_tokens=True,
+            truncation=True,
+            max_length=self.text_max_len,
+            pad_to_max_length=True,
+            return_token_type_ids=True
+        )
+        text_ids = inputs['input_ids']
+        text_attention_mask = inputs['attention_mask']
+        text_ids = torch.tensor(np.array(text_ids).astype('int64'))
+        text_attention_mask = torch.tensor(np.array(text_attention_mask).astype('int64'))
+        
+        return video,text_ids,text_attention_mask
+    
+    def collate_fn(self,batch):
+        # 自定义dataloader 对一个batch的处理方式
+        # 需要完成的任务有：
+        # 1. 对video和audio的序列进行padding
+        # 2. 对text，label_ids同样padding
+        video_stacks = []
+        text_stacks = []
+        text_attention_stacks = []
+        for i in batch:
+            video_stacks.append(i[0])
+            text_stacks.append(i[1])
+            text_attention_stacks.append(i[2])
+        
+        video_stacks = pad_sequence(video_stacks,batch_first=True,padding_value=0)
+        text_stacks = pad_sequence(text_stacks,batch_first=True,padding_value=0) # 实际上没有pad
+        # 实际上并没有padding，因为label变成multi-hot向量，长度都是82
+        text_attention_stacks = pad_sequence(text_attention_stacks,batch_first=True,padding_value=0) # 实际上也没有pad
+        return video_stacks,text_stacks,text_attention_stacks

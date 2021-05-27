@@ -27,6 +27,8 @@ class NeXtVLAD(nn.Module):
         for name,parameter in self.named_parameters():
             if(name in ['linear_1','attention_1','cluster_weights','cluster_weights2']):
                 nn.init.kaiming_normal_(parameter)
+            if(name in ['bn_1','bn_2']):
+                nn.init.zeros_(parameter)
     def forward(self,input,mask=None):
         # input shape (B,M,N)
         _,seq_len,_ = input.shape

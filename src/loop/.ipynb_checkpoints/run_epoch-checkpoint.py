@@ -5,7 +5,7 @@ import json
 import numpy as np
 import utils.train_util as train_util
 import os
-
+# from apex import amp
 def training_loop(model, loader, loss_compute,modal_name_list, device,epoch,TBoard):
     scalars = {'video': 0, 'audio': 0, 'text': 0, 'fusion': 0}
     model.train()
@@ -42,6 +42,8 @@ def training_loop(model, loader, loss_compute,modal_name_list, device,epoch,TBoa
             scalars[key] += loss_dict[key].item()
         losses.append(loss.item())
         # 反向传播计算梯度
+        # with amp.scale_loss(loss, loss_compute.optimizer) as scaled_loss:
+        #     scaled_loss.backward()   # loss要这么用
         loss.backward()
         nn.utils.clip_grad_norm_(model.parameters(),max_norm=1,norm_type=2)
         # 更新网络参数
@@ -84,10 +86,7 @@ def validating_loop(model, loader, loss_compute,modal_name_list,device,epoch,TBo
             loss = loss_compute(pred['predictions'],val_label)
             pred = pred['predictions'].detach().cpu().numpy()
             val_label = label.cpu().numpy()
-            #print(np.array(pred_gap))
-            #print(val_label_gap)
             gap = train_util.calculate_gap(pred, val_label)
-            # print('gap: ',gap)
             evl_metrics[index].accumulate(pred, val_label, loss=0)
     for index,modal_name in enumerate(modal_name_list+['fusion']):
         metric_dict[modal_name] = evl_metrics[index].get()
@@ -177,3 +176,33 @@ def raw_validating_loop(model, loader, loss_compute,modal_name_list,device,epoch
         metric_dict[modal_name] = evl_metrics[index].get()
         gap_dict[modal_name] = metric_dict[modal_name]['gap']
     return gap_dict
+
+def dual_training_loop(model, loader, loss_compute,modal_name_list, device,epoch,TBoard):
+    model.train()
+    losses = []
+    last_lr = loss_compute.optimizer.param_groups[0]['lr']
+    for i, batch in enumerate(tqdm(loader, desc=f'train ({epoch})')):
+        loss_compute.optimizer.zero_grad()
+        video,text,text_mask = batch
+        video = video.to(device)
+        text = text.to(device)
+        text_mask = text_mask.to(device)
+        
+        inputs_dict={}
+        inputs_dict['video'] = video
+        inputs_dict['text'] = text
+        inputs_dict['attention_mask'] = text_mask
+        pred = model(inputs_dict)
+        loss_dict = {}
+        loss = loss_compute(pred)
+        losses.append(loss.item())
+        # 反向传播计算梯度
+        loss.backward()
+        # nn.utils.clip_grad_norm_(model.parameters(),max_norm=1,norm_type=2)
+        # 更新网络参数
+        loss_compute.optimizer.step()
+        if(loss_compute.optimizer.param_groups[0]['lr'] != last_lr):
+            last_lr = loss_compute.optimizer.param_groups[0]['lr']
+            print(loss_compute.optimizer.param_groups[0]['lr'])
+    loss_compute.lr_scheduler.step()
+    return sum(losses)/len(losses)

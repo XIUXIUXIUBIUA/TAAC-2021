@@ -36,6 +36,8 @@ class SE(nn.Module):
         for name,parameter in self.named_parameters():
             if(name in ['hidden1_weights','gating_weights_1','gating_weights_2']):
                 nn.init.kaiming_normal_(parameter)
+            if(name in ['bn_1','bn_2']):
+                nn.init.zeros_(parameter)
             #if(name in ['text_factor','video_factor','fusion_weights']):
             #    nn.init.xavier_uniform_(parameter)
     def forward(self,input_list):

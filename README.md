@@ -1,7 +1,7 @@
 # TAAC-2021
-- date: 2021-5-12
+- date: 2021-5-27
 - author: mafp
-- version: 1.0
+- version: 1.1
 
 ## torch 版本 baseline
 ### 使用方法

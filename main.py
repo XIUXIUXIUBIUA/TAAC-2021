@@ -13,7 +13,7 @@ from src.model.baseline_model import Baseline
 from src.loop.run_epoch import training_loop,validating_loop
 from torch.utils import tensorboard as tensorboard
 from datetime import datetime
-
+# from apex import amp
 if __name__ == '__main__':
     # 定义配置文件路径并读入文件
     torch.multiprocessing.set_start_method('spawn',force=True)
@@ -38,12 +38,14 @@ if __name__ == '__main__':
                             collate_fn=val_dataset.collate_fn)
     # 定义模型
     model = Baseline(config['ModelConfig'])
+    model_path = '../checkpoint/0527/01/30.pt'
+    model.load_state_dict(torch.load(model_path))
     model.to(train_dataset.device)
     modal_name_list = model.modal_name_list
     # 定义loss函数和优化器
     criterion = nn.BCELoss(reduction='none')# sum应该没问题吧
     # 不同部件采用不同的学习率
-    '''
+    
     # video+bert
     classifier_params = list(map(id, model.classifier_dict.parameters()))
     bert_params = list(map(id,model.head_dict['text'].parameters()))
@@ -54,8 +56,8 @@ if __name__ == '__main__':
                 {'params': base_params},
                 {'params': model.classifier_dict.parameters(), 'lr': 1e-2},
                 {'params': model.head_dict['text'].parameters(),'lr': 1e-5}],lr=1e-4)
-    '''
     
+    '''
     # video only
     classifier_params = list(map(id, model.classifier_dict.parameters()))
     base_params = filter(lambda p: id(p) not in (classifier_params),
@@ -63,15 +65,16 @@ if __name__ == '__main__':
     optimizer = torch.optim.Adam([
                 {'params': base_params},
                 {'params': model.classifier_dict.parameters(), 'lr': 1e-2}],lr=1e-4)
-    
+    '''
     # model = torch.nn.DataParallel(model,device_ids)
+    # model,optimizer = amp.initialize(model, optimizer, opt_level="O1")
     warm_up_epochs = 5
     max_num_epochs = 50
     lr_milestones = [20,40,60]
     warm_up_with_multistep_lr = lambda epoch: (epoch+1) / warm_up_epochs if epoch < warm_up_epochs else 0.1**len([m for m in lr_milestones if m <= epoch])
     warm_up_with_cosine_lr = lambda epoch: (epoch+1) / warm_up_epochs if epoch < warm_up_epochs \
     else 0.5 * ( math.cos((epoch - warm_up_epochs) /(max_num_epochs - warm_up_epochs) * math.pi) + 1)
-    lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,lr_lambda=warm_up_with_cosine_lr)
+    lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,lr_lambda=warm_up_with_multistep_lr)
     loss_compute = SimpleLossCompute(criterion,optimizer,lr_scheduler)
     best_gap = 0
     # 开始训练epoch
@@ -88,8 +91,11 @@ if __name__ == '__main__':
                 
             if(gap_dict['fusion']>best_gap):
                 best_gap = gap_dict['fusion']
-                model_name = f'../checkpoint/0524/01/epoch_{epoch}_{best_gap}.pt'
-                # torch.save(model.state_dict(),model_name)
+                save_path = '../checkpoint/0527/02/'
+                if not os.path.exists(save_path):
+                    os.makedirs(save_path)
+                model_name = f'epoch_{epoch} '+str(best_gap)[:5]+'.pt'
+                torch.save(model.state_dict(),save_path+model_name)
         # break
     # 保存模型
     

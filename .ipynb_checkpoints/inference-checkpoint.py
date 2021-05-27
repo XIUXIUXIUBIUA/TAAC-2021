@@ -17,10 +17,10 @@ if __name__ == '__main__':
     config_path = './config/config.yaml'
     config = yaml.load(open(config_path))
     dataset = TestingDataset(config['DatasetConfig'])
-    model_path = "../checkpoint/0524/epoch_28_0.7606.pt" # 已保存模型的路径
+    model_path = "../checkpoint/0527/02/epoch_22 0.766.pt" # 已保存模型的路径
     device = 'cuda'
     top_k=20
-    output_json = './h.json'
+    output_json = './0527_01.json'
     model = Baseline(config['ModelConfig'])
     model.load_state_dict(torch.load(model_path))
     model.to(device)
