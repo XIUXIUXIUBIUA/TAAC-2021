@@ -25,18 +25,25 @@ class ContrastiveLossCompute(object):
         self.margin = margin
     def __call__(self, pred):
         video_rep = pred['video']
-        text_rep = pred['text']
+        text_rep = pred['audio']
         B = video_rep.shape[0]
         
         video_pos = video_rep[:(B//2)]
         text_pos = text_rep[:(B//2)]
         video_neg = video_rep[(B//2):]
         text_neg = text_rep[(B//2):]
+        '''
+        pos_pos_dist = F.cosine_similarity(video_pos,text_pos,dim=-1)
+        pos_neg_dist = F.cosine_similarity(video_pos,text_neg,dim=-1)
+        neg_pos_dist = F.cosine_similarity(video_neg,text_pos,dim=-1)
+        neg_neg_dist = F.cosine_similarity(video_neg,text_neg,dim=-1)
+        '''             
         
         pos_pos_dist = F.pairwise_distance(video_pos,text_pos,p=2)
         pos_neg_dist = F.pairwise_distance(video_pos,text_neg,p=2)
         neg_pos_dist = F.pairwise_distance(video_neg,text_pos,p=2)
         neg_neg_dist = F.pairwise_distance(video_neg,text_neg,p=2)
+        
         
         loss1 = self.hinge_loss(pos_pos_dist, pos_neg_dist)
         loss2 = self.hinge_loss(pos_pos_dist, neg_pos_dist)
@@ -48,4 +55,3 @@ class ContrastiveLossCompute(object):
         return loss
     def hinge_loss(self,low, high):
         return torch.mean(F.relu(low + self.margin - high))
-    

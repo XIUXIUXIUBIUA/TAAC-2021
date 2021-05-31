@@ -8,6 +8,7 @@ class Baseline(nn.Module):
     def __init__(self,model_config):
         # 这里的config是model config
         super(Baseline,self).__init__()
+        self.late_fusion = model_config['late_fusion']
         self.with_video_head = model_config['with_video_head']
         self.with_audio_head = model_config['with_audio_head']
         self.with_text_head = model_config['with_text_head']
@@ -29,9 +30,6 @@ class Baseline(nn.Module):
         if self.with_image_head:
             self.modal_name_list.append('image')
         
-        #self.video_head = video_head.get_instance(model_config['video_head'])
-        #self.fusion_head = fusion_head.get_instance(model_config['fusion_head'])
-        
         self.fusion_head_dict=nn.ModuleDict()
         self.classifier_dict=nn.ModuleDict()
         self.head_dict=nn.ModuleDict()
@@ -45,14 +43,20 @@ class Baseline(nn.Module):
             # classifier 参数调整以及定义
             tagging_classifier_params = model_config['tagging_classifier_params'].copy()
             tagging_classifier_params['input_dim'] = tagging_classifier_params['input_dim'][modal]
-            self.classifier_dict[modal] = classcify_head.get_instance(model_config['tagging_classifier_type'], tagging_classifier_params)
+            if(modal == 'video'):
+                self.classifier_dict[modal] = classcify_head.get_instance('LogisticModel_', tagging_classifier_params)
+            else:
+                self.classifier_dict[modal] = classcify_head.get_instance(model_config['tagging_classifier_type'], tagging_classifier_params)
             
             if modal=='video':
                 self.head_dict[modal] = video_head.get_instance(model_config['video_head_type'], model_config['video_head_params'])
             elif modal=='audio':
                 self.head_dict[modal] = video_head.get_instance(model_config['audio_head_type'], model_config['audio_head_params'])
             elif modal == 'text':
-                self.head_dict[modal] = text_head.get_instance(model_config['text_head_type'], model_config['text_head_params'])
+                if(model_config['text_head_type']=='BERT'):
+                    self.head_dict[modal] = text_head.get_instance(model_config['text_head_type'], model_config['text_head_params'])
+                else:
+                    self.head_dict[modal] = text_head.get_instance(model_config['text_head_type'], model_config['text_cnn_params'])
             elif modal == 'image':
                 self.head_dict[modal] = image_head.get_instance(model_config['image_head_type'], model_config['image_head_params'])
             elif modal == 'fusion':
@@ -90,7 +94,10 @@ class Baseline(nn.Module):
             if modal_name in ['video', 'audio']:
                 embedding = self.head_dict[modal_name](inputs_dict[modal_name], mask=mask)
             elif modal_name == 'text':
-                embedding =  self.head_dict[modal_name](inputs_dict[modal_name],inputs_dict['attention_mask'])
+                if(inputs_dict['attention_mask'] != None):
+                    embedding =  self.head_dict[modal_name](inputs_dict[modal_name],inputs_dict['attention_mask'])
+                else:
+                    embedding =  self.head_dict[modal_name](inputs_dict[modal_name])
             else:
                 embedding =  self.head_dict[modal_name](inputs_dict[modal_name])
             if self.with_embedding_bn:
@@ -104,10 +111,29 @@ class Baseline(nn.Module):
             embedding_list.append(embedding)
         fusion_embedding = self.fusion_head_dict['fusion'](embedding_list)
         probs = self.classifier_dict['fusion'](fusion_embedding) # mafp: classifier也是多头的
-        prob_dict['tagging_output_fusion'] = probs
-        prob_dict['video_embedding'] = fusion_embedding
         
+        if self.late_fusion:
+            preds=[]
+            for modal_name in self.modal_name_list:    
+                preds += [prob_dict['tagging_output_' + modal_name]['predictions']]
+            preds += [probs['predictions']]
+            prob_dict['tagging_output_fusion'] = {'predictions': torch.sum(torch.stack(preds), 0)/len(preds)}
+        else:
+            prob_dict['tagging_output_fusion'] = probs
+            prob_dict['video_embedding'] = fusion_embedding
+        '''
+        if self.late_fusion:
+            preds = torch.zeros((batch_size,82)).to('cuda')
+            for modal_name in self.modal_name_list:    
+                preds += prob_dict['tagging_output_' + modal_name]['predictions']
+            preds += probs['predictions']
+            prob_dict['tagging_output_fusion'] = {'predictions':preds/(len(self.modal_name_list)+1)}
+        else:
+            prob_dict['tagging_output_fusion'] = probs
+            prob_dict['video_embedding'] = fusion_embedding
+        '''
         return prob_dict
+    
     def  _modal_drop(self, x, rate=0.0, noise_shape=None):
         """模态dropout"""
         random_scale = torch.rand(noise_shape)
@@ -116,10 +142,10 @@ class Baseline(nn.Module):
         probs = keep_mask.type(torch.float32) # cast将张量进行类型转换
         return ret, probs
 
-class enhance_network(nn.Module):
+class Dual(nn.Module):
     def __init__(self,model_config):
         # 这里的config是model config
-        super(enhance_network,self).__init__()
+        super(Dual,self).__init__()
         self.with_video_head = model_config['with_video_head']
         self.with_audio_head = model_config['with_audio_head']
         self.with_text_head = model_config['with_text_head']
@@ -141,13 +167,11 @@ class enhance_network(nn.Module):
         if self.with_image_head:
             self.modal_name_list.append('image')
         
-        #self.video_head = video_head.get_instance(model_config['video_head'])
-        #self.fusion_head = fusion_head.get_instance(model_config['fusion_head'])
         
         self.fusion_head_dict=nn.ModuleDict()
         self.classifier_dict=nn.ModuleDict()
         self.head_dict=nn.ModuleDict()
-        
+        # self.projector = nn.Sequential(nn.Linear(16384,1024),nn.BatchNorm1d(1024),nn.ReLU(),nn.Linear(1024,1024))
         for modal in (self.modal_name_list+['fusion']):
             # fusion_head 参数调整以及定义
             fusion_head_params = model_config['fusion_head_params'].copy()
@@ -186,10 +210,13 @@ class enhance_network(nn.Module):
         embedding_list = []
         representation_dict = {}
         # 每个模态分别表征
-        for modal_name in self.modal_name_list:    
+        forward_modal = self.modal_name_list.copy()
+        del forward_modal[-1]
+        # print(forward_modal)
+        for modal_name in forward_modal:    
             #Modal Dropout
             mask = None
-            if modal_name in ['video', 'audio']:
+            if modal_name in ['video','audio']:
                 if(len(inputs_dict['video'].shape)==3):
                     drop_shape = [batch_size, 1, 1]
                 else:
@@ -199,9 +226,9 @@ class enhance_network(nn.Module):
                 drop_shape = [batch_size, 1]
             elif modal_name == 'image': 
                 drop_shape = [batch_size, 1, 1, 1]
-            if self.training and self.use_modal_drop:
+            if self.training and self.use_modal_drop and modal_name!='audio':
                 inputs_dict[modal_name], prob_dict[modal_name+'_loss_weight'] = self._modal_drop(inputs_dict[modal_name], self.modal_drop_rate, drop_shape)
-            if modal_name in ['video', 'audio']:
+            if modal_name in ['video','audio']:
                 embedding = self.head_dict[modal_name](inputs_dict[modal_name], mask=mask)
             elif modal_name == 'text':
                 embedding =  self.head_dict[modal_name](inputs_dict[modal_name],inputs_dict['attention_mask'])
@@ -212,6 +239,10 @@ class enhance_network(nn.Module):
             encode_emb = self.fusion_head_dict[modal_name]([embedding])
             # prob_dict['tagging_output_'+modal_name] = self.classifier_dict[modal_name](encode_emb)
             embedding_list.append(embedding)
+            '''
+            if(modal_name=='video'):
+                embedding = self.projector(embedding)
+            '''    
             representation_dict[modal_name] = encode_emb
         # embedding_list 中是维度相同的输入classifier之前的特征
         

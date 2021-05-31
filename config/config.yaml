@@ -7,7 +7,7 @@ ModelConfig:
   with_embedding_bn: False #对不同模态输入特征进行BN归一化
   modal_drop_rate: 0.3
   with_video_head: True #视频特征
-  with_audio_head: False #音频特征
+  with_audio_head: True #音频特征
   with_text_head: True  #文本特征
   with_image_head: False # False #图片特征
 
@@ -30,9 +30,18 @@ ModelConfig:
     max_frames: 300
 
   #文本特征(1024)
-  text_head_type: 'BERT'
+  text_head_type: 'BERT' #'TextCnn'
   text_head_params:
     bert_path: '../pretrained/bert'
+  text_cnn_params:
+    embed_num: 14769
+    embed_dim: 300
+    feature_dim: 1024
+    kernel_num: 10
+    kernel_sizes: [3,4,5]
+    dropout: 0.5
+    embedding_path: '/home/tione/notebook/pretrained'
+    embedding_name: 'sgns.baidubaike.bigram-char'
     # bert_emb_encode_size: 1024
   
   #图片特征(2048)
@@ -56,7 +65,7 @@ ModelConfig:
       audio: 1024
       image: 0
       text: 1024 
-      fusion: 17408
+      fusion: 18432 #18432
   #tagging分类器参数
   tagging_classifier_type: 'LogisticModel'
   tagging_classifier_params:
@@ -67,6 +76,7 @@ ModelConfig:
       image: 0
       text: 1024
       fusion: 1024
+  late_fusion: True
     
 #############################################################
 #2. Optimizer & Train Configs
@@ -114,4 +124,7 @@ DatasetConfig:
   label_id_path: '/home/tione/notebook/dataset/label_id.txt'
   bert_path: '../pretrained/bert'
   text_max_len: 256
+  csv_path: './scripts/bert_finetune_data.csv'
+  embedding_path: '/home/tione/notebook/pretrained'
+  embedding_name: 'sgns.baidubaike.bigram-char'
   device: 'cuda'

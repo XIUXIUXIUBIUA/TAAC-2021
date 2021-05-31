@@ -15,20 +15,28 @@ def training_loop(model, loader, loss_compute,modal_name_list, device,epoch,TBoa
     for i, batch in enumerate(tqdm(loader, desc=f'train ({epoch})')):
         
         loss_compute.optimizer.zero_grad()
-        
-        video,audio,text,text_mask,label = batch
-        
-        video = video.to(device)
-        audio = audio.to(device)
-        text = text.to(device)
-        text_mask = text_mask.to(device)
-        label = label.to(device)
+        if(len(batch)==5):
+            video,audio,text,text_mask,label = batch
+            video = video.to(device)
+            audio = audio.to(device)
+            text = text.to(device)
+            text_mask = text_mask.to(device)
+            label = label.to(device)
+        else:
+            video,audio,text,label = batch
+            video = video.to(device)
+            audio = audio.to(device)
+            text = text.to(device)
+            label = label.to(device)
         
         inputs_dict={}
         inputs_dict['video'] = video
         inputs_dict['audio'] = audio
-        inputs_dict['text'] = text
-        inputs_dict['attention_mask'] = text_mask
+        inputs_dict['text'] = text 
+        if(len(batch)==5):
+            inputs_dict['attention_mask'] = text_mask
+        else:
+            inputs_dict['attention_mask'] = None
         pred = model(inputs_dict)
         loss_dict = {}
         loss = 0
@@ -45,12 +53,10 @@ def training_loop(model, loader, loss_compute,modal_name_list, device,epoch,TBoa
         # with amp.scale_loss(loss, loss_compute.optimizer) as scaled_loss:
         #     scaled_loss.backward()   # loss要这么用
         loss.backward()
-        nn.utils.clip_grad_norm_(model.parameters(),max_norm=1,norm_type=2)
+        # nn.utils.clip_grad_norm_(model.parameters(),max_norm=1,norm_type=2)
         # 更新网络参数
         loss_compute.optimizer.step()
-        if(loss_compute.optimizer.param_groups[0]['lr'] != last_lr):
-            last_lr = loss_compute.optimizer.param_groups[0]['lr']
-            print(loss_compute.optimizer.param_groups[0]['lr'])
+    print(loss_compute.optimizer.param_groups[0]['lr'])
     loss_compute.lr_scheduler.step()
     for modal in (modal_name_list+['fusion']):
         TBoard.add_scalar(f'train/{modal}_loss', scalars[modal], epoch)
@@ -65,19 +71,28 @@ def validating_loop(model, loader, loss_compute,modal_name_list,device,epoch,TBo
     metric_dict = {}
     gap_dict = {}
     for i,batch in enumerate(loader):
-        video,audio,text,text_mask,label = batch
-        
-        video = video.to(device)
-        audio = audio.to(device)
-        text = text.to(device)
-        text_mask = text_mask.to(device)
-        label = label.to(device)
+        if(len(batch)==5):
+            video,audio,text,text_mask,label = batch
+            video = video.to(device)
+            audio = audio.to(device)
+            text = text.to(device)
+            text_mask = text_mask.to(device)
+            label = label.to(device)
+        else:
+            video,audio,text,label = batch
+            video = video.to(device)
+            audio = audio.to(device)
+            text = text.to(device)
+            label = label.to(device)
         
         inputs_dict={}
         inputs_dict['video'] = video
         inputs_dict['audio'] = audio
-        inputs_dict['text'] = text
-        inputs_dict['attention_mask'] = text_mask
+        inputs_dict['text'] = text 
+        if(len(batch)==5):
+            inputs_dict['attention_mask'] = text_mask
+        else:
+            inputs_dict['attention_mask'] = None
         
         pred_dict = model(inputs_dict)
         for index,modal_name in enumerate(modal_name_list+['fusion']):
@@ -183,13 +198,15 @@ def dual_training_loop(model, loader, loss_compute,modal_name_list, device,epoch
     last_lr = loss_compute.optimizer.param_groups[0]['lr']
     for i, batch in enumerate(tqdm(loader, desc=f'train ({epoch})')):
         loss_compute.optimizer.zero_grad()
-        video,text,text_mask = batch
+        video,audio,text,text_mask = batch
         video = video.to(device)
+        audio = audio.to(device)
         text = text.to(device)
         text_mask = text_mask.to(device)
         
         inputs_dict={}
         inputs_dict['video'] = video
+        inputs_dict['audio'] = audio
         inputs_dict['text'] = text
         inputs_dict['attention_mask'] = text_mask
         pred = model(inputs_dict)

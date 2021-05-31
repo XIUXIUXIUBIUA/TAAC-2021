@@ -22,40 +22,15 @@ class SE(nn.Module):
 
         if(self.gating_last_bn):
             self.bn_3 = nn.BatchNorm1d(self.hidden1_size)
-        '''
-        rank = 50
-        d_model_text = 1024
-        d_model_video = 16384
-        self.post_fusion_dropout = nn.Dropout(p=0.1)
-        self.text_factor = Parameter(torch.Tensor(rank, d_model_text + 1, d_model_text))
-        self.video_factor = Parameter(torch.Tensor(rank, d_model_video + 1, d_model_video))
-        
-        self.fusion_weights = Parameter(torch.Tensor(1, rank))
-        self.fusion_bias = Parameter(torch.Tensor(1, d_model_video))
-        '''
         for name,parameter in self.named_parameters():
             if(name in ['hidden1_weights','gating_weights_1','gating_weights_2']):
                 nn.init.kaiming_normal_(parameter)
-            if(name in ['bn_1','bn_2']):
-                nn.init.zeros_(parameter)
+            
             #if(name in ['text_factor','video_factor','fusion_weights']):
             #    nn.init.xavier_uniform_(parameter)
     def forward(self,input_list):
         #if(len(input_list)==1):
-        concat_feat = torch.cat(input_list,dim=1)
-        ''' 
-        else:
-            batch_size,d_model_video = input_list[0].shape
-            _video_h = torch.cat((Variable(torch.ones(batch_size,1), requires_grad=False), input_list[0]), dim=-1)
-            _text_h = torch.cat((Variable(torch.ones(batch_size,1), requires_grad=False), input_list[1]), dim=-1)
-            
-            # _audio_h 是(B,S,d_audio+1), audio_factor 是 (rank,d+1,d_out)
-            # 可以考虑 (B,S,d+1) --> (B*S,d+1)
-            fusion_zy = torch.matmul(_video_h, self.video_factor) * torch.matmul(_text_h, self.text_factor)
-            del _audio_h,_video_h
-            fusion_memory = torch.matmul(self.fusion_weights, fusion_zy.permute(1, 0, 2)).squeeze() + self.fusion_bias
-            concat_feat = fusion_memory.contiguous().view(batch_size,d_model_video)
-        '''
+        concat_feat = torch.cat(input_list,dim=1) 
         if(self.drop_rate>0.):
             # mafp: care 一下
             concat_feat = self.dropout_1(concat_feat)

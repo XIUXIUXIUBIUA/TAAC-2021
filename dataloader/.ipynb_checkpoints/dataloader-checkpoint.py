@@ -14,6 +14,13 @@ import albumentations as A
 from albumentations.pytorch import ToTensorV2
 from albumentations import ImageOnlyTransform
 import cv2
+import torchtext
+import torchtext.data as data
+import torchtext.datasets as datasets
+import jieba
+from torchtext import data
+import logging
+jieba.setLogLevel(logging.INFO)
 class MultimodaFeaturesDataset(Dataset):
 
     def __init__(self,dataset_config,job='training'):
@@ -161,9 +168,13 @@ class TestingDataset(Dataset):
         file_name = os.path.basename(test_file)
         video_id = os.path.basename(test_file).split('.m')[0]
         #--------------- video/audio ----------------#
-        
-        feat_dict['video'] = torch.tensor(np.load(os.path.join(feat_path,'video_npy' ,'Youtube8M', 'tagging', video_id + '.npy')).astype(np.float32))
-        # feat_dict['audio'] = torch.tensor(np.load(os.path.join(feat_path, 'audio_npy', 'Vggish', 'tagging', video_id + '.npy')).astype(np.float32))
+        video_path = os.path.join(feat_path,'video_npy' ,'Youtube8M', 'tagging', video_id + '.npy')
+        feat_dict['video'] = torch.tensor(np.load(video_path).astype(np.float32))
+        audio_path = os.path.join(feat_path, 'audio_npy', 'Vggish', 'tagging', video_id + '.npy')
+        if(os.path.exists(audio_path)):
+            feat_dict['audio'] = torch.tensor(np.load(audio_path).astype(np.float32))
+        else:
+            feat_dict['audio'] = torch.tensor(np.random.random((feat_dict['video'].shape[0],128)).astype(np.float32))
         
         #--------------- text ----------------#
         text_path = os.path.join(feat_path, 'text_txt', 'tagging', video_id + '.txt')
@@ -188,6 +199,9 @@ class TestingDataset(Dataset):
         feat_dict['text_ids'] = torch.tensor(np.array(text_ids).astype('int64'))
         feat_dict['text_attention_mask'] = torch.tensor(np.array(text_attention_mask).astype('int64'))
         feat_dict['file_name'] = file_name
+        feat_dict['audio_path'] = audio_path
+        feat_dict['video_path'] = video_path
+        feat_dict['text_path'] = text_path
         return feat_dict
     
     
@@ -339,10 +353,10 @@ class DualDataset(Dataset):
 
     def __init__(self,dataset_config,job='training'):
         
-        self.data_num_per_sample = 3 # 在train.txt中每个sample占6行
+        self.data_num_per_sample = 4 # 在train.txt中每个sample占6行
         self.text_max_len = dataset_config['text_max_len']
         self.device = dataset_config['device']
-        self.meta_path = '/home/tione/notebook/dataset/tagging/GroundTruth/datafile/train_test.txt'
+        self.meta_path = '/home/tione/notebook/dataset/tagging/GroundTruth/datafile/self_sup_VAT.txt'
         self.tokenizer = BertTokenizer.from_pretrained(dataset_config['bert_path'])
         self.label2id = {}
         with open(dataset_config['label_id_path'],'r') as f:
@@ -357,8 +371,9 @@ class DualDataset(Dataset):
             line = linecache.getline(self.meta_path,line_i)
             line = line.strip('\r\n')
             data_list.append(line)
-        video,text_ids,text_attention_mask = self.preprocess(data_list)
-        return video,text_ids,text_attention_mask
+        # print(len(data_list))
+        video,audio,text_ids,text_attention_mask = self.preprocess(data_list)
+        return video,audio,text_ids,text_attention_mask
     def __len__(self):
         # TODO 不能固定长度
         with open(self.meta_path,'r') as f:
@@ -366,10 +381,15 @@ class DualDataset(Dataset):
         return len(lines)//self.data_num_per_sample
     def preprocess(self,data_list):
         
-        video_path,text_path = data_list
+        video_path,audio_path,text_path = data_list
         
-        #--------------- video ----------------#
+        #--------------- video/audio ----------------#
         video = torch.tensor(np.load(video_path).astype(np.float32))
+        
+        if os.path.exists(audio_path):
+            audio = torch.tensor(np.load(audio_path).astype(np.float32))
+        else:
+            audio = torch.tensor(np.random.random((video.shape[0],128)).astype(np.float32))
             
         #--------------- text ----------------#
         text = ''
@@ -394,7 +414,7 @@ class DualDataset(Dataset):
         text_ids = torch.tensor(np.array(text_ids).astype('int64'))
         text_attention_mask = torch.tensor(np.array(text_attention_mask).astype('int64'))
         
-        return video,text_ids,text_attention_mask
+        return video,audio,text_ids,text_attention_mask
     
     def collate_fn(self,batch):
         # 自定义dataloader 对一个batch的处理方式
@@ -402,15 +422,128 @@ class DualDataset(Dataset):
         # 1. 对video和audio的序列进行padding
         # 2. 对text，label_ids同样padding
         video_stacks = []
+        audio_stacks = []
         text_stacks = []
         text_attention_stacks = []
         for i in batch:
             video_stacks.append(i[0])
-            text_stacks.append(i[1])
-            text_attention_stacks.append(i[2])
+            audio_stacks.append(i[1])
+            text_stacks.append(i[2])
+            text_attention_stacks.append(i[3])
         
         video_stacks = pad_sequence(video_stacks,batch_first=True,padding_value=0)
+        audio_stacks = pad_sequence(audio_stacks,batch_first=True,padding_value=0)
         text_stacks = pad_sequence(text_stacks,batch_first=True,padding_value=0) # 实际上没有pad
         # 实际上并没有padding，因为label变成multi-hot向量，长度都是82
         text_attention_stacks = pad_sequence(text_attention_stacks,batch_first=True,padding_value=0) # 实际上也没有pad
-        return video_stacks,text_stacks,text_attention_stacks
+        return video_stacks,audio_stacks,text_stacks,text_attention_stacks
+    
+    
+class Datasetfortextcnn(Dataset):
+
+    def __init__(self,dataset_config,job='training'):
+        
+        self.data_num_per_sample = 6 # 在train.txt中每个sample占6行
+        self.text_max_len = dataset_config['text_max_len']
+        self.device = dataset_config['device']
+        self.csv_path = dataset_config['csv_path']
+        if(job=='training'):
+            self.meta_path = dataset_config['train_data_path']
+        elif(job=='valdation'):
+            self.meta_path = dataset_config['val_data_path']
+        else:
+            self.meta_path = dataset_config['test_data_path']
+        # self.tokenizer = BertTokenizer.from_pretrained(dataset_config['bert_path'])
+        self.label2id = {}
+        with open(dataset_config['label_id_path'],'r') as f:
+            for line in f:
+                line = line.strip('\r\n')
+                line = line.split('\t')
+                self.label2id[line[0]] = int(line[1])
+        text_field = data.Field(lower=True, tokenize = self.tokenize)
+        fields = [('text', text_field),('label',None)]
+        train_dataset = data.TabularDataset(path=self.csv_path,format='tsv',skip_header=True,fields=fields)
+        
+        vectors = torchtext.vocab.Vectors(name=dataset_config['embedding_name'], cache=dataset_config['embedding_path'])
+        text_field.build_vocab(train_dataset,min_freq=5,vectors=vectors)
+        self.vocab = text_field.vocab
+    def __getitem__(self, index):
+        # 1. 从train.txt读取对应 idx 的path
+        data_list = [] # 存储对于index的各个模态数据的路径和样本标签
+        for line_i in range(self.data_num_per_sample*index+1,self.data_num_per_sample*(index+1)):
+            line = linecache.getline(self.meta_path,line_i)
+            line = line.strip('\r\n')
+            data_list.append(line)
+        video,audio,text_ids,label_ids = self.preprocess(data_list)
+        return video,audio,text_ids,label_ids
+    def __len__(self):
+        # TODO 不能固定长度
+        with open(self.meta_path,'r') as f:
+            lines = f.readlines()
+        return len(lines)//self.data_num_per_sample
+    def preprocess(self,data_list):
+        
+        video_path,audio_path,image_path,text_path,label = data_list
+        
+        #--------------- video ----------------#
+        video = torch.tensor(np.load(video_path).astype(np.float32))
+        
+        #--------------- audio ----------------#
+        if os.path.exists(audio_path):
+            audio = torch.tensor(np.load(audio_path).astype(np.float32))
+        else:
+            audio = torch.tensor(np.random.random((video.shape[0],128)).astype(np.float32))
+            
+        #--------------- text ----------------#
+        
+        text = ''
+        with open(text_path,'r') as f:
+            for line in f:
+                dic = eval(line)
+           
+        for key in dic:
+            dic[key] = ''.join(re.findall('[\u4e00-\u9fa5]',dic[key]))
+            text += dic[key]
+        
+        
+        inputs = self.tokenize(text)
+        text_ids = [self.vocab.stoi[word] for word in inputs]
+        #text_attention_mask = inputs['attention_mask']
+        text_ids = torch.tensor(np.array(text_ids).astype('int64'))
+        #text_attention_mask = torch.tensor(np.array(text_attention_mask).astype('int64'))
+        #--------------- label ----------------#
+        label_ids = []
+        label = label.split(',')
+        np.random.shuffle(label)
+        for i in label:
+            label_ids.append(self.label2id[i])
+        # label_ids = torch.tensor(np.array(label_ids).astype('int64'))
+        dense_label_ids = torch.zeros(82)# ,dtype=torch.int64)
+        dense_label_ids[label_ids] = 1
+        # return video,audio,label_ids
+        return video,audio,text_ids,dense_label_ids
+    
+    def collate_fn(self,batch):
+        # 自定义dataloader 对一个batch的处理方式
+        # 需要完成的任务有：
+        # 1. 对video和audio的序列进行padding
+        # 2. 对text，label_ids同样padding
+        video_stacks = []
+        audio_stacks = []
+        text_stacks = []
+        label_stacks = []
+        for i in batch:
+            video_stacks.append(i[0])
+            audio_stacks.append(i[1])
+            text_stacks.append(i[2])
+            label_stacks.append(i[3])
+        
+        video_stacks = pad_sequence(video_stacks,batch_first=True,padding_value=0)
+        audio_stacks = pad_sequence(audio_stacks,batch_first=True,padding_value=0)
+        text_stacks = pad_sequence(text_stacks,batch_first=True,padding_value=1) # 实际上没有pad
+        # 实际上并没有padding，因为label变成multi-hot向量，长度都是82
+        label_stacks = pad_sequence(label_stacks,batch_first=True,padding_value=0) 
+        return video_stacks,audio_stacks,text_stacks,label_stacks
+        # return video_stacks,audio_stacks,label_stacks
+    def tokenize(self,text):
+        return [word for word in jieba.cut(text) if word.strip()]

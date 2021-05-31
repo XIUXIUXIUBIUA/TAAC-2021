@@ -17,10 +17,10 @@ if __name__ == '__main__':
     config_path = './config/config.yaml'
     config = yaml.load(open(config_path))
     dataset = TestingDataset(config['DatasetConfig'])
-    model_path = "../checkpoint/0527/02/epoch_22 0.766.pt" # 已保存模型的路径
+    model_path = "../checkpoint/0531/02/epoch_24 0.7771.pt" # 已保存模型的路径
     device = 'cuda'
     top_k=20
-    output_json = './0527_01.json'
+    output_json = './0531_02.json'
     model = Baseline(config['ModelConfig'])
     model.load_state_dict(torch.load(model_path))
     model.to(device)
@@ -31,19 +31,19 @@ if __name__ == '__main__':
         feat_dict = dataset[i]
 
         video = feat_dict['video']
-        # audio = feat_dict['audio']
+        audio = feat_dict['audio']
         text = feat_dict['text_ids']
         text_mask = feat_dict['text_attention_mask']
         file_name = feat_dict['file_name']
 
         video = video.to(device)
-        # audio = audio.to(device)
+        audio = audio.to(device)
         text = text.to(device)
         text_mask = text_mask.to(device)
 
         inputs_dict={}
         inputs_dict['video'] = video.unsqueeze(0)
-        # inputs_dict['audio'] = audio.unsqueeze(0)
+        inputs_dict['audio'] = audio.unsqueeze(0)
         inputs_dict['text'] = text.unsqueeze(0)
         inputs_dict['attention_mask'] = text_mask.unsqueeze(0)
 

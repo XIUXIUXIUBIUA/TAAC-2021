@@ -26,10 +26,10 @@ if __name__ == '__main__':
     device_ids = [0]
     # 定义数据集并封装dataloader
     train_dataset = DualDataset(config['DatasetConfig'],job='training')
-    train_dataset.data_num_per_sample = 3
-    train_dataset.meta_path = '/home/tione/notebook/dataset/tagging/GroundTruth/datafile/train_test.txt'
+    train_dataset.data_num_per_sample = 4
+    train_dataset.meta_path = '/home/tione/notebook/dataset/tagging/GroundTruth/datafile/self_sup_VAT.txt'
     train_loader = DataLoader(train_dataset,num_workers=8,
-                              batch_size=config['DatasetConfig']['batch_size']*len(device_ids),
+                              batch_size=64,
                               shuffle=True,
                               pin_memory=True,
                               collate_fn=train_dataset.collate_fn)
@@ -37,10 +37,13 @@ if __name__ == '__main__':
     model = Dual(config['ModelConfig'])
     model.to(train_dataset.device)
     modal_name_list = model.modal_name_list
+    
     # 定义loss函数和优化器
     criterion = nn.BCELoss(reduction='none')# sum应该没问题吧
     # 不同部件采用不同的学习率
     
+    
+    '''
     # video+bert
     bert_params = list(map(id,model.head_dict['text'].parameters()))
     base_params = filter(lambda p: id(p) not in bert_params,
@@ -48,6 +51,10 @@ if __name__ == '__main__':
     optimizer = torch.optim.Adam([
                 {'params': base_params},
                 {'params': model.head_dict['text'].parameters(),'lr': 1e-5}],lr=1e-4)
+    '''
+    # video+audio
+    optimizer = torch.optim.Adam(model.parameters(),lr=1e-4)
+    
     warm_up_epochs = 5
     max_num_epochs = 50
     lr_milestones = [20,40,60]
@@ -59,14 +66,14 @@ if __name__ == '__main__':
     loss_compute = ContrastiveLossCompute(optimizer,lr_scheduler,margin=1.0)
     best_gap = 0
     # 开始训练epoch
-    epoch_num=31
+    epoch_num=51
     loss_epoch = []
     for epoch in range(epoch_num):
         loss = dual_training_loop(model, train_loader, loss_compute, modal_name_list,train_dataset.device, epoch,TBoard)
         loss_epoch.append(loss)
         print(loss)
         if(epoch%10==0):
-            save_path = '../checkpoint/0527/01/'
+            save_path = '../checkpoint/0529/enhance_VA/'
             model_name = f'{epoch}.pt'
             if not os.path.exists(save_path):
                 os.makedirs(save_path)
