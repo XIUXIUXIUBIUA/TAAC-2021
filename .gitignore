@@ -1,2 +1,3 @@
 results/
 core*
+.vector_cache/
