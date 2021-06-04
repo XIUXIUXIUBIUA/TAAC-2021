@@ -54,13 +54,14 @@ if __name__ == '__main__':
     # 定义模型
     model = Baseline(config['ModelConfig'])
     
-    model_path = '../checkpoint/enhance_VT/30.pt'
+    model_path = '../checkpoint/0604/enhance_resnet50/30_wop.pt'
     model_dict = model.state_dict() # 定义模型的参数字典
     extractor = torch.load(model_path) # 加载预训练模型
     # state_dict = {k:v for k,v in extractor.items() if k in model_dict.keys()}
     state_dict = {k:v for k,v in extractor.items() if ((k.split('.')[0]!='classifier_dict')and(k in model_dict.keys()))} # 不加载classifier的参数
     model_dict.update(state_dict)
     model.load_state_dict(model_dict)
+    
     
     model.to(train_dataset.device)
     modal_name_list = model.modal_name_list
@@ -126,7 +127,7 @@ if __name__ == '__main__':
                 
             if(gap_dict['fusion']>best_gap):
                 best_gap = gap_dict['fusion']
-                save_path = '../checkpoint/0531/02/'
+                save_path = '../checkpoint/0604/lr/'
                 if not os.path.exists(save_path):
                     os.makedirs(save_path)
                 model_name = f'epoch_{epoch} '+str(best_gap)[:6]+'.pt'

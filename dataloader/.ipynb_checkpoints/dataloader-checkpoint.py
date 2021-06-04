@@ -168,7 +168,8 @@ class TestingDataset(Dataset):
         file_name = os.path.basename(test_file)
         video_id = os.path.basename(test_file).split('.m')[0]
         #--------------- video/audio ----------------#
-        video_path = os.path.join(feat_path,'video_npy' ,'Youtube8M', 'tagging', video_id + '.npy')
+        video_path = os.path.join('../dataset/frames/test_5k', video_id + '.npy')
+        # video_path = os.path.join(feat_path,'video_npy' ,'Youtube8M', 'tagging', video_id + '.npy')
         feat_dict['video'] = torch.tensor(np.load(video_path).astype(np.float32))
         audio_path = os.path.join(feat_path, 'audio_npy', 'Vggish', 'tagging', video_id + '.npy')
         if(os.path.exists(audio_path)):

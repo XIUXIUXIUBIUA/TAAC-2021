@@ -56,7 +56,7 @@ def training_loop(model, loader, loss_compute,modal_name_list, device,epoch,TBoa
         # nn.utils.clip_grad_norm_(model.parameters(),max_norm=1,norm_type=2)
         # 更新网络参数
         loss_compute.optimizer.step()
-    print(loss_compute.optimizer.param_groups[0]['lr'])
+    # print(loss_compute.optimizer.param_groups[0]['lr'])
     loss_compute.lr_scheduler.step()
     for modal in (modal_name_list+['fusion']):
         TBoard.add_scalar(f'train/{modal}_loss', scalars[modal], epoch)

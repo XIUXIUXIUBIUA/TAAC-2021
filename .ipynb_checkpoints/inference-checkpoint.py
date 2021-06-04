@@ -17,14 +17,19 @@ if __name__ == '__main__':
     config_path = './config/config.yaml'
     config = yaml.load(open(config_path))
     dataset = TestingDataset(config['DatasetConfig'])
-    model_path = "../checkpoint/0531/02/epoch_24 0.7771.pt" # 已保存模型的路径
+    model_path_1 = "../checkpoint/0604/resnet50/epoch_22 0.7814.pt" # 已保存模型的路径
+    models_path = [model_path_1]
     device = 'cuda'
     top_k=20
-    output_json = './0531_02.json'
-    model = Baseline(config['ModelConfig'])
-    model.load_state_dict(torch.load(model_path))
-    model.to(device)
-    model.eval()
+    output_json = './0604_01.json'
+    models = []
+    for path in models_path:
+        model = Baseline(config['ModelConfig'])
+        model.load_state_dict(torch.load(path))
+        model.to(device)
+        model.eval()
+        models.append(model)
+    
     tagging_class_num = 82
     output_result = {}
     for i in tqdm(range(len(dataset))):
@@ -46,9 +51,13 @@ if __name__ == '__main__':
         inputs_dict['audio'] = audio.unsqueeze(0)
         inputs_dict['text'] = text.unsqueeze(0)
         inputs_dict['attention_mask'] = text_mask.unsqueeze(0)
-
-        pred_dict = model(inputs_dict)
-        scores = pred_dict['tagging_output_fusion']['predictions'].cpu()
+        
+        scores = torch.zeros(1,82)
+        for model in models:
+            pred_dict = model(inputs_dict)
+            scores += pred_dict['tagging_output_fusion']['predictions'].cpu()
+        
+        scores = scores/len(models)
         scores,indices = scores[0].sort(descending=True)
         scores = scores.detach().numpy()
         indices = indices.detach().numpy()

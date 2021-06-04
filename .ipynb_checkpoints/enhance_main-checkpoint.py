@@ -27,7 +27,7 @@ if __name__ == '__main__':
     # 定义数据集并封装dataloader
     train_dataset = DualDataset(config['DatasetConfig'],job='training')
     train_dataset.data_num_per_sample = 4
-    train_dataset.meta_path = '/home/tione/notebook/dataset/tagging/GroundTruth/datafile/self_sup_VAT.txt'
+    train_dataset.meta_path = '/home/tione/notebook/dataset/tagging/GroundTruth/datafile/self_sup_VAT_R.txt'
     train_loader = DataLoader(train_dataset,num_workers=8,
                               batch_size=64,
                               shuffle=True,
@@ -43,18 +43,22 @@ if __name__ == '__main__':
     # 不同部件采用不同的学习率
     
     
-    '''
+    
     # video+bert
+    video_params = list(map(id,model.head_dict['video'].parameters()))
     bert_params = list(map(id,model.head_dict['text'].parameters()))
-    base_params = filter(lambda p: id(p) not in bert_params,
+    base_params = filter(lambda p: id(p) not in bert_params+video_params,
                          model.parameters())
     optimizer = torch.optim.Adam([
                 {'params': base_params},
+                {'params': model.head_dict['video'].parameters(),'lr': 1e-4},
                 {'params': model.head_dict['text'].parameters(),'lr': 1e-5}],lr=1e-4)
+    
+    
     '''
     # video+audio
     optimizer = torch.optim.Adam(model.parameters(),lr=1e-4)
-    
+    '''
     warm_up_epochs = 5
     max_num_epochs = 50
     lr_milestones = [20,40,60]
@@ -73,8 +77,8 @@ if __name__ == '__main__':
         loss_epoch.append(loss)
         print(loss)
         if(epoch%10==0):
-            save_path = '../checkpoint/0529/enhance_VA/'
-            model_name = f'{epoch}.pt'
+            save_path = '../checkpoint/0604/enhance_resnet50/'
+            model_name = f'{epoch}_wop.pt'
             if not os.path.exists(save_path):
                 os.makedirs(save_path)
             torch.save(model.state_dict(),save_path+model_name)

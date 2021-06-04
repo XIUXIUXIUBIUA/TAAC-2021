@@ -25,7 +25,7 @@ class ContrastiveLossCompute(object):
         self.margin = margin
     def __call__(self, pred):
         video_rep = pred['video']
-        text_rep = pred['audio']
+        text_rep = pred['text']
         B = video_rep.shape[0]
         
         video_pos = video_rep[:(B//2)]

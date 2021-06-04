@@ -171,7 +171,8 @@ class Dual(nn.Module):
         self.fusion_head_dict=nn.ModuleDict()
         self.classifier_dict=nn.ModuleDict()
         self.head_dict=nn.ModuleDict()
-        # self.projector = nn.Sequential(nn.Linear(16384,1024),nn.BatchNorm1d(1024),nn.ReLU(),nn.Linear(1024,1024))
+        self.projector_video = nn.Sequential(nn.Linear(16384,2048),nn.BatchNorm1d(2048),nn.ReLU(),nn.Linear(2048,2048))
+        self.projector_text = nn.Sequential(nn.Linear(1024,2048),nn.BatchNorm1d(2048),nn.ReLU(),nn.Linear(2048,2048))
         for modal in (self.modal_name_list+['fusion']):
             # fusion_head 参数调整以及定义
             fusion_head_params = model_config['fusion_head_params'].copy()
@@ -211,7 +212,7 @@ class Dual(nn.Module):
         representation_dict = {}
         # 每个模态分别表征
         forward_modal = self.modal_name_list.copy()
-        del forward_modal[-1]
+        del forward_modal[1]
         # print(forward_modal)
         for modal_name in forward_modal:    
             #Modal Dropout
@@ -240,9 +241,11 @@ class Dual(nn.Module):
             # prob_dict['tagging_output_'+modal_name] = self.classifier_dict[modal_name](encode_emb)
             embedding_list.append(embedding)
             '''
-            if(modal_name=='video'):
-                embedding = self.projector(embedding)
-            '''    
+            if(modal_name == 'video'):
+                project_embedding = self.projector_video(embedding)
+            else:
+                project_embedding = self.projector_text(embedding)
+            '''        
             representation_dict[modal_name] = encode_emb
         # embedding_list 中是维度相同的输入classifier之前的特征
         

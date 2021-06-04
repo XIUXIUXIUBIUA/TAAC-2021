@@ -36,4 +36,4 @@ class LogisticModel_(nn.Module):
         logits = self.linear_1(model_input)
         output = torch.sigmoid(logits)
         return {"predictions": output, "logits": logits}
-        
+

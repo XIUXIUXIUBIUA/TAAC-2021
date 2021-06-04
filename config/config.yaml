@@ -17,7 +17,7 @@ ModelConfig:
     nextvlad_cluster_size: 128
     groups: 16
     expansion: 2
-    feature_size: 1024 #inception feature dim
+    feature_size: 2048 #inception feature dim
     max_frames: 300
 
   #语音特征(1024)
@@ -61,11 +61,11 @@ ModelConfig:
       text: 0.5
       fusion: 0.8
     concat_feat_dim: 
-      video: 16384
+      video: 32768 #16384
       audio: 1024
       image: 0
       text: 1024 
-      fusion: 18432 #18432
+      fusion: 34816 #18432
   #tagging分类器参数
   tagging_classifier_type: 'LogisticModel'
   tagging_classifier_params:
@@ -114,9 +114,9 @@ DatasetConfig:
   train_raw_data_path: '/home/tione/notebook/dataset/tagging/GroundTruth/datafile/raw_train_good.txt'
   val_raw_data_path: '/home/tione/notebook/dataset/tagging/GroundTruth/datafile/raw_val_good.txt'
   test_raw_data_path: '/home/tione/notebook/dataset/videos/video_5k/test_5k/'
-  train_data_path: '/home/tione/notebook/dataset/tagging/GroundTruth/datafile/train_good.txt'
+  train_data_path: '/home/tione/notebook/dataset/tagging/GroundTruth/datafile/train_resnet.txt'
   #train_data_path: '/home/tione/notebook/dataset/structuring/GroundTruth/datafile/train.txt'
-  val_data_path: '/home/tione/notebook/dataset/tagging/GroundTruth/datafile/val_good.txt'
+  val_data_path: '/home/tione/notebook/dataset/tagging/GroundTruth/datafile/val_resnet.txt'
   #val_data_path: '/home/tione/notebook/dataset/structuring/GroundTruth/datafile/val.txt'
   test_data_path: '../dataset/videos/video_5k/test_5k/'
   test_feat_path: '../dataset/tagging/tagging_dataset_test_5k/'
