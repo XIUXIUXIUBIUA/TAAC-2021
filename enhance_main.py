@@ -66,7 +66,7 @@ if __name__ == '__main__':
     warm_up_with_cosine_lr = lambda epoch: (epoch+1) / warm_up_epochs if epoch < warm_up_epochs \
     else 0.5 * ( math.cos((epoch - warm_up_epochs) /(max_num_epochs - warm_up_epochs) * math.pi) + 1)
     
-    lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,lr_lambda=warm_up_with_multistep_lr)
+    lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,lr_lambda=warm_up_with_cosine_lr)
     loss_compute = ContrastiveLossCompute(optimizer,lr_scheduler,margin=1.0)
     best_gap = 0
     # 开始训练epoch
@@ -77,8 +77,8 @@ if __name__ == '__main__':
         loss_epoch.append(loss)
         print(loss)
         if(epoch%10==0):
-            save_path = '../checkpoint/0604/enhance_resnet50/'
-            model_name = f'{epoch}_wop.pt'
+            save_path = '../checkpoint/0608/enhance_VT_lr/'
+            model_name = f'{epoch}_wp.pt'
             if not os.path.exists(save_path):
                 os.makedirs(save_path)
             torch.save(model.state_dict(),save_path+model_name)

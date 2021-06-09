@@ -17,7 +17,7 @@ ModelConfig:
     nextvlad_cluster_size: 128
     groups: 16
     expansion: 2
-    feature_size: 2048 #inception feature dim
+    feature_size: 1792 #2048 #inception feature dim
     max_frames: 300
 
   #语音特征(1024)
@@ -61,11 +61,11 @@ ModelConfig:
       text: 0.5
       fusion: 0.8
     concat_feat_dim: 
-      video: 32768 #16384
+      video: 28672 #32768 #16384
       audio: 1024
       image: 0
       text: 1024 
-      fusion: 34816 #18432
+      fusion: 30720 #18432
   #tagging分类器参数
   tagging_classifier_type: 'LogisticModel'
   tagging_classifier_params:

@@ -76,10 +76,11 @@ class MultimodaFeaturesDataset(Dataset):
         with open(text_path,'r') as f:
             for line in f:
                 dic = eval(line)
-           
+          
         for key in dic:
             dic[key] = ''.join(re.findall('[\u4e00-\u9fa5]',dic[key]))
             text += dic[key]
+        
         
         # text = ''.join(re.findall('[\u4e00-\u9fa5]',dic['video_asr']))
         inputs = self.tokenizer.encode_plus(

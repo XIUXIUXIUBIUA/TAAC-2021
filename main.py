@@ -26,7 +26,7 @@ def setup_seed(seed):
 if __name__ == '__main__':
     # 定义配置文件路径并读入文件
     torch.multiprocessing.set_start_method('spawn',force=True)
-    setup_seed(seed=2021)
+    setup_seed(seed=2022)
     log_dir = os.path.join('./results/logs/',datetime.now().strftime("%Y%m%d%H%M%S"))
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
@@ -54,11 +54,12 @@ if __name__ == '__main__':
     # 定义模型
     model = Baseline(config['ModelConfig'])
     
-    model_path = '../checkpoint/0604/enhance_resnet50/30_wop.pt'
+    # 加载自监督模型
+    model_path = '../checkpoint/0608/enhance_VT_lr/50_wp.pt'
     model_dict = model.state_dict() # 定义模型的参数字典
     extractor = torch.load(model_path) # 加载预训练模型
     # state_dict = {k:v for k,v in extractor.items() if k in model_dict.keys()}
-    state_dict = {k:v for k,v in extractor.items() if ((k.split('.')[0]!='classifier_dict')and(k in model_dict.keys()))} # 不加载classifier的参数
+    state_dict = {k:v for k,v in extractor.items() if ((k.split('.')[0]!='classifier_dict')and(k.split('.')[0]!='fusion_head_dict')and(k.split('.')[1]!='fusion')and(k in model_dict.keys()))} # 不加载classifier的参数
     model_dict.update(state_dict)
     model.load_state_dict(model_dict)
     
@@ -102,14 +103,14 @@ if __name__ == '__main__':
     # model,optimizer = amp.initialize(model, optimizer, opt_level="O1")
     warm_up_epochs = 5
     max_num_epochs = 100
-    lr_milestones = [20,40,60]
+    lr_milestones = [20,40,50,60]
     warm_up_with_multistep_lr = lambda epoch: (epoch+1) / warm_up_epochs if epoch < warm_up_epochs else 0.1**len([m for m in lr_milestones if m <= epoch])
     warm_up_with_cosine_lr = lambda epoch: (epoch+1) / warm_up_epochs if epoch < warm_up_epochs \
     else 0.5 * ( math.cos((epoch - warm_up_epochs) /(max_num_epochs - warm_up_epochs) * math.pi) + 1)
     lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,lr_lambda=warm_up_with_multistep_lr)
     
-    base_lr = [1e-5,1e-3,1e-5,1e-6]
-    max_lr = [1e-4,1e-2,1e-4,1e-5]
+    base_lr = [1e-6,1e-4,1e-5,1e-5,1e-5,1e-5,1e-7]
+    max_lr = [1e-4,1e-2,1e-3,1e-3,1e-3,1e-3,1e-5]
     # lr_scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=base_lr, max_lr=max_lr,step_size_up=700,mode='triangular2',cycle_momentum=False)
     loss_compute = SimpleLossCompute(criterion,optimizer,lr_scheduler)
     best_gap = 0
@@ -127,7 +128,7 @@ if __name__ == '__main__':
                 
             if(gap_dict['fusion']>best_gap):
                 best_gap = gap_dict['fusion']
-                save_path = '../checkpoint/0604/lr/'
+                save_path = '../checkpoint/0609/02/'
                 if not os.path.exists(save_path):
                     os.makedirs(save_path)
                 model_name = f'epoch_{epoch} '+str(best_gap)[:6]+'.pt'

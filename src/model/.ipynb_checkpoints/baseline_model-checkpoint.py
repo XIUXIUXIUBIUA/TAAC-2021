@@ -84,7 +84,8 @@ class Baseline(nn.Module):
                     drop_shape = [batch_size, 1, 1]
                 else:
                     drop_shape = [batch_size,1,1,1,1]
-                mask = (inputs_dict[modal_name] != 0).type(torch.float32).sum(dim=-1).sum(dim=-1).sum(dim=-1).type(torch.bool)
+                # mask = (inputs_dict[modal_name] != 0).type(torch.float32).sum(dim=-1).type(torch.bool)
+                mask = None
             elif modal_name == 'text': 
                 drop_shape = [batch_size, 1]
             elif modal_name == 'image': 
@@ -108,7 +109,10 @@ class Baseline(nn.Module):
             #else:
             encode_emb = self.fusion_head_dict[modal_name]([embedding])
             prob_dict['tagging_output_'+modal_name] = self.classifier_dict[modal_name](encode_emb)
-            embedding_list.append(embedding)
+            # 不对audio concat
+            # if(self.audio_max_frame==300 or modal_name!='audio'):
+            if(modal_name!='audio'):
+                embedding_list.append(embedding)
         fusion_embedding = self.fusion_head_dict['fusion'](embedding_list)
         probs = self.classifier_dict['fusion'](fusion_embedding) # mafp: classifier也是多头的
         
@@ -171,8 +175,8 @@ class Dual(nn.Module):
         self.fusion_head_dict=nn.ModuleDict()
         self.classifier_dict=nn.ModuleDict()
         self.head_dict=nn.ModuleDict()
-        self.projector_video = nn.Sequential(nn.Linear(16384,2048),nn.BatchNorm1d(2048),nn.ReLU(),nn.Linear(2048,2048))
-        self.projector_text = nn.Sequential(nn.Linear(1024,2048),nn.BatchNorm1d(2048),nn.ReLU(),nn.Linear(2048,2048))
+        self.projector_video = nn.Identity()
+        self.projector_text = nn.Sequential(nn.Linear(1024,2048),nn.BatchNorm1d(2048),nn.ReLU(),nn.Linear(2048,28672))
         for modal in (self.modal_name_list+['fusion']):
             # fusion_head 参数调整以及定义
             fusion_head_params = model_config['fusion_head_params'].copy()
@@ -196,7 +200,6 @@ class Dual(nn.Module):
                 pass
             else:
                 raise NotImplementedError
-        
         '''
         print('initialization: xavier')
         for p in self.parameters():
@@ -240,13 +243,13 @@ class Dual(nn.Module):
             encode_emb = self.fusion_head_dict[modal_name]([embedding])
             # prob_dict['tagging_output_'+modal_name] = self.classifier_dict[modal_name](encode_emb)
             embedding_list.append(embedding)
-            '''
+            
             if(modal_name == 'video'):
                 project_embedding = self.projector_video(embedding)
-            else:
+            elif(modal_name == 'text'):
                 project_embedding = self.projector_text(embedding)
-            '''        
-            representation_dict[modal_name] = encode_emb
+                    
+            representation_dict[modal_name] = project_embedding
         # embedding_list 中是维度相同的输入classifier之前的特征
         
         return representation_dict
