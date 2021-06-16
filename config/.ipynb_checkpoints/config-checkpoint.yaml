@@ -65,7 +65,7 @@ ModelConfig:
       audio: 1024
       image: 0
       text: 1024 
-      fusion: 30720 #18432
+      fusion: 29696 #18432
   #tagging分类器参数
   tagging_classifier_type: 'LogisticModel'
   tagging_classifier_params:
@@ -109,7 +109,7 @@ OptimizerConfig:
 #    3. DataSet Config
 #############################################################
 DatasetConfig:
-  batch_size: 32
+  batch_size: 48
   shuffle: True
   train_raw_data_path: '/home/tione/notebook/dataset/tagging/GroundTruth/datafile/raw_train_good.txt'
   val_raw_data_path: '/home/tione/notebook/dataset/tagging/GroundTruth/datafile/raw_val_good.txt'

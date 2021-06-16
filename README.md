@@ -1,39 +1,35 @@
 # TAAC-2021
-- date: 2021-5-27
+- date: 2021-6-16
 - author: mafp
-- version: 1.1
+- version: 2.0 正式版
 
 ## torch 版本 baseline
 ### 使用方法
-1. 修改config/config.yaml中DatasetConfig的路径
-2. 修改 main.py 中的 epoch_num或者其他配置
-3. python main.py 
-4. python inference.py
+1. init.sh 一键配置
+2. setup.sh 安装所需的包（建议在notebook中运行）
+3. 运行命令，理论上能得到0.789左右的模型
 
-### 完成进度
-- 完成了video audio text 和 fusion 3个支路
-- 完成了不同模块分别设置学习率，modal dropout，learning rate decay，warmup
-- 完成了训练、验证和测试整个流程
-- 支持多卡训练（虽然速度并没有提升，建议还是使用单张V100）
-
-### 等待完成
-- 层级MLP、标签分层
-- 扰动
-- 日志
+```bash
+python -W ignore main.py   --device_ids 0 \ # 双卡则采用[0,1]
+                            --pretrained_model ../checkpoint/50_wp.pt \ # 自监督预训练模型的路径
+                            --saved_path ../checkpoint/0616/01/ # 模型保存路径
+```
 
 ### 模型性能
-- 在使用video和text两个分路时，在验证集上达到了0.83，但在测试集上只有0.766
-- 训练1个epoch大约 1min15s
+- 单模型最高0.7894
+- ensemble 可达0.795
 
 ### 改进建议
-1. 对比tf版本，看是否少了什么trick？
-2. 参考石头哥的建议：学习率(warmup,restart)、扰动、层级mlp、asrocr用textCNN
-3. 特征提取、视频裁剪
-
+1. 自监督
+2. 弱监督
+3. 分类器改进
+4. ensemble
+5. 切分/多分辨率
+6. 文本清洗、预处理
+7. 关键帧提取、增加图像分支
+8. 分析标签、数据
+9. 视频裁剪再提取特征
 ### 迁移注意事项
-1. 注意需要在TTAC-2021的上级目录中存在 pretrained/bert，存放bert预训练模型，下载链接：https://huggingface.co/bert-base-chinese
-2. pip install transformers
-3. 注意路径修改
 
 
 

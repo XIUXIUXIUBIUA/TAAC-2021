@@ -17,11 +17,11 @@ if __name__ == '__main__':
     config_path = './config/config.yaml'
     config = yaml.load(open(config_path))
     dataset = TestingDataset(config['DatasetConfig'])
-    model_path_1 = "../checkpoint/0607/01/epoch_56 0.7846.pt" # 已保存模型的路径
+    model_path_1 = '../checkpoint/0610/03/epoch_40 0.8996.pt'# 已保存模型的路径
     models_path = [model_path_1]
     device = 'cuda'
     top_k=20
-    output_json = './0607_01.json'
+    output_json = './0610_03.json'
     models = []
     for path in models_path:
         model = Baseline(config['ModelConfig'])

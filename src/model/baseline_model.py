@@ -84,8 +84,8 @@ class Baseline(nn.Module):
                     drop_shape = [batch_size, 1, 1]
                 else:
                     drop_shape = [batch_size,1,1,1,1]
-                # mask = (inputs_dict[modal_name] != 0).type(torch.float32).sum(dim=-1).type(torch.bool)
-                mask = None
+                mask = (inputs_dict[modal_name] != 0).type(torch.float32).sum(dim=-1).type(torch.bool)
+                # mask = None
             elif modal_name == 'text': 
                 drop_shape = [batch_size, 1]
             elif modal_name == 'image': 
@@ -225,7 +225,7 @@ class Dual(nn.Module):
                     drop_shape = [batch_size, 1, 1]
                 else:
                     drop_shape = [batch_size,1,1,1,1]
-                mask = (inputs_dict[modal_name] != 0).type(torch.float32).sum(dim=-1).sum(dim=-1).sum(dim=-1).type(torch.bool)
+                mask = (inputs_dict[modal_name] != 0).type(torch.float32).sum(dim=-1).type(torch.bool)
             elif modal_name == 'text': 
                 drop_shape = [batch_size, 1]
             elif modal_name == 'image': 
@@ -240,7 +240,7 @@ class Dual(nn.Module):
                 embedding =  self.head_dict[modal_name](inputs_dict[modal_name])
             if self.with_embedding_bn:
                 pass
-            encode_emb = self.fusion_head_dict[modal_name]([embedding])
+            # encode_emb = self.fusion_head_dict[modal_name]([embedding])
             # prob_dict['tagging_output_'+modal_name] = self.classifier_dict[modal_name](encode_emb)
             embedding_list.append(embedding)
             
@@ -248,7 +248,7 @@ class Dual(nn.Module):
                 project_embedding = self.projector_video(embedding)
             elif(modal_name == 'text'):
                 project_embedding = self.projector_text(embedding)
-                    
+             
             representation_dict[modal_name] = project_embedding
         # embedding_list 中是维度相同的输入classifier之前的特征
         

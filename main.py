@@ -15,6 +15,7 @@ from torch.utils import tensorboard as tensorboard
 from datetime import datetime
 import numpy as np
 import random
+import argparse
 # from apex import amp
 def setup_seed(seed):
     torch.manual_seed(seed)
@@ -24,6 +25,21 @@ def setup_seed(seed):
     torch.backends.cudnn.deterministic = True
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Run experiment')
+    parser.add_argument(
+        '--pretrained_model', type=str, default='../checkpoint/0616/enhance_VT/50_wop.pt', 
+        help='自监督预训练模型的路径'
+    )
+    parser.add_argument(
+        '--device_ids', type=int, nargs='+', required=True,
+        help='GPU id列表'
+    )
+    parser.add_argument(
+        '--saved_path', type=str, default='../checkpoint/0616/01/',
+        help='训练模型保存路径'
+    )
+    args = parser.parse_args()
+    
     # 定义配置文件路径并读入文件
     torch.multiprocessing.set_start_method('spawn',force=True)
     setup_seed(seed=2022)
@@ -33,7 +49,7 @@ if __name__ == '__main__':
     TBoard = tensorboard.SummaryWriter(log_dir=log_dir)
     config_path = './config/config.yaml'
     config = yaml.load(open(config_path))
-    device_ids = [0]
+    device_ids = args.device_ids #[0,1]
     # 定义数据集并封装dataloader
     if(config['ModelConfig']['text_head_type']=='BERT'):
         train_dataset = MultimodaFeaturesDataset(config['DatasetConfig'],job='training')
@@ -42,12 +58,12 @@ if __name__ == '__main__':
         train_dataset = Datasetfortextcnn(config['DatasetConfig'],job='training')
         val_dataset = Datasetfortextcnn(config['DatasetConfig'],job='valdation')
     
-    train_loader = DataLoader(train_dataset,num_workers=8,
+    train_loader = DataLoader(train_dataset,num_workers=2,
                               batch_size=config['DatasetConfig']['batch_size']*len(device_ids),
                               shuffle=True,
                               pin_memory=True,
                               collate_fn=train_dataset.collate_fn)
-    val_loader = DataLoader(val_dataset,num_workers=8,
+    val_loader = DataLoader(val_dataset,num_workers=2,
                             batch_size=config['DatasetConfig']['batch_size']*len(device_ids),
                             pin_memory=False,
                             collate_fn=val_dataset.collate_fn)
@@ -55,7 +71,7 @@ if __name__ == '__main__':
     model = Baseline(config['ModelConfig'])
     
     # 加载自监督模型
-    model_path = '../checkpoint/0608/enhance_VT_lr/50_wp.pt'
+    model_path = args.pretrained_model #'../checkpoint/0616/enhance_VT/50_wop.pt'
     model_dict = model.state_dict() # 定义模型的参数字典
     extractor = torch.load(model_path) # 加载预训练模型
     # state_dict = {k:v for k,v in extractor.items() if k in model_dict.keys()}
@@ -98,7 +114,8 @@ if __name__ == '__main__':
                 {'params': base_params},
                 {'params': model.classifier_dict.parameters(), 'lr': 1e-2}],lr=1e-4)
     '''
-    # model = torch.nn.DataParallel(model,device_ids)
+    if(len(device_ids)!=1):
+        model = torch.nn.DataParallel(model,device_ids)
     #model.load_state_dict(torch.load(model_path))
     # model,optimizer = amp.initialize(model, optimizer, opt_level="O1")
     warm_up_epochs = 5
@@ -121,18 +138,24 @@ if __name__ == '__main__':
         loss = training_loop(model, train_loader, loss_compute, modal_name_list,train_dataset.device, epoch,TBoard)
         loss_epoch.append(loss)
         if(epoch%2==0): # 每2个epoch 验证一次
-            gap_dict = validating_loop(model,val_loader, loss_compute,modal_name_list,train_dataset.device, epoch,TBoard)
+            with torch.no_grad():
+                gap_dict = validating_loop(model,val_loader, loss_compute,modal_name_list,train_dataset.device, epoch,TBoard)
             
             for modal in modal_name_list+['fusion']:
                 print(f'epoch({epoch})({modal}): ',gap_dict[modal])
                 
             if(gap_dict['fusion']>best_gap):
                 best_gap = gap_dict['fusion']
-                save_path = '../checkpoint/0609/02/'
+                save_path = args.saved_path#'../checkpoint/0616/01/'
                 if not os.path.exists(save_path):
                     os.makedirs(save_path)
                 model_name = f'epoch_{epoch} '+str(best_gap)[:6]+'.pt'
-                torch.save(model.state_dict(),save_path+model_name)
+                
+                if(len(device_ids)==1):
+                    torch.save(model.state_dict(),save_path+model_name)
+                else:
+                    torch.save(model.module.state_dict(),save_path+model_name)
+                
         # break
     # 保存模型
     

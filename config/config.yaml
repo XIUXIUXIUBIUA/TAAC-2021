@@ -109,7 +109,7 @@ OptimizerConfig:
 #    3. DataSet Config
 #############################################################
 DatasetConfig:
-  batch_size: 32
+  batch_size: 48
   shuffle: True
   train_raw_data_path: '/home/tione/notebook/dataset/tagging/GroundTruth/datafile/raw_train_good.txt'
   val_raw_data_path: '/home/tione/notebook/dataset/tagging/GroundTruth/datafile/raw_val_good.txt'

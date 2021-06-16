@@ -23,13 +23,13 @@ if __name__ == '__main__':
     TBoard = tensorboard.SummaryWriter(log_dir=log_dir)
     config_path = './config/config.yaml'
     config = yaml.load(open(config_path))
-    device_ids = [0]
+    device_ids = [0,1]
     # 定义数据集并封装dataloader
     train_dataset = DualDataset(config['DatasetConfig'],job='training')
     train_dataset.data_num_per_sample = 4
     train_dataset.meta_path = '/home/tione/notebook/dataset/tagging/GroundTruth/datafile/self_sup_VAT_R.txt'
-    train_loader = DataLoader(train_dataset,num_workers=8,
-                              batch_size=64,
+    train_loader = DataLoader(train_dataset,num_workers=2,
+                              batch_size=128,
                               shuffle=True,
                               pin_memory=True,
                               collate_fn=train_dataset.collate_fn)
@@ -54,7 +54,7 @@ if __name__ == '__main__':
                 {'params': model.head_dict['video'].parameters(),'lr': 1e-4},
                 {'params': model.head_dict['text'].parameters(),'lr': 1e-5}],lr=1e-4)
     
-    
+    model = torch.nn.DataParallel(model,device_ids)
     '''
     # video+audio
     optimizer = torch.optim.Adam(model.parameters(),lr=1e-4)
@@ -77,11 +77,11 @@ if __name__ == '__main__':
         loss_epoch.append(loss)
         print(loss)
         if(epoch%10==0):
-            save_path = '../checkpoint/0608/enhance_VT_lr/'
-            model_name = f'{epoch}_wp.pt'
+            save_path = '../checkpoint/0616/enhance_VT/'
+            model_name = f'{epoch}_wop.pt'
             if not os.path.exists(save_path):
                 os.makedirs(save_path)
-            torch.save(model.state_dict(),save_path+model_name)
+            torch.save(model.module.state_dict(),save_path+model_name)
         
         # break
     # 保存模型

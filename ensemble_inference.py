@@ -76,13 +76,15 @@ if __name__ == '__main__':
     model_path_12 = '../checkpoint/0608/01/epoch_28 0.7869.pt'
     '''
     
-    # val test
-    model_path_1 = '../checkpoint/0607/01/epoch_56 0.7846.pt'
-    model_path_2 = '../checkpoint/0607/01/epoch_42 0.7843.pt'
-    model_path_3 = '../checkpoint/0607/02/epoch_28 0.7822.pt'
-    model_path_4 = '../checkpoint/0607/02/epoch_50 0.7835.pt'
-    model_path_5 = '../checkpoint/0607/01/epoch_28 0.7831.pt'
-    model_path_6 = '../checkpoint/0607/02/epoch_48 0.7830.pt'
+    # val 0792 test 07938
+    model_path_1 = '../checkpoint/0610/03/epoch_50 0.9010.pt'
+    model_path_2 = '../checkpoint/0610/03/epoch_44 0.9004.pt'
+    
+    model_path_3 = '../checkpoint/0610/03/epoch_52 0.9011.pt'
+    model_path_4 = '../checkpoint/0610/03/epoch_40 0.8996.pt'
+    model_path_5 = '../checkpoint/0610/03/epoch_32 0.8901.pt'
+    model_path_6 = '../checkpoint/0610/03/epoch_24 0.8793.pt'
+    
     model_path_7 = '../checkpoint/0607/03/epoch_88 0.7873.pt'
     model_path_8 = '../checkpoint/0607/03/epoch_46 0.7862.pt'
     model_path_9 = '../checkpoint/0607/03/epoch_28 0.7855.pt'
@@ -93,14 +95,15 @@ if __name__ == '__main__':
     model_path_13 = '../checkpoint/0608/03/epoch_28 0.7877.pt'
     model_path_14 = '../checkpoint/0608/03/epoch_52 0.7890.pt'
     model_path_15 = '../checkpoint/0608/03/epoch_74 0.7896.pt'
-    models_path = [model_path_1,
+    models_path = [model_path_1,model_path_3,model_path_4,model_path_5,model_path_6,
                    model_path_7,model_path_8,model_path_9,
                    model_path_10,model_path_11,
                    model_path_14,model_path_15]
     
+
     device = 'cuda'
     top_k=20
-    output_json = './0608_03.json'
+    output_json = './0610_03.json'
     models = []
     
     '''
@@ -112,7 +115,7 @@ if __name__ == '__main__':
         models.append(model)
     '''
     for path in models_path:
-        if(path.split('/')[2]+path.split('/')[3]!='060803'):
+        if((path.split('/')[2]+path.split('/')[3]=='060801')or(path.split('/')[2]=='0607')):
             config['ModelConfig']['fusion_head_params']['concat_feat_dim']['fusion'] = 30720
             config['ModelConfig']['audio_head_params']['max_frames'] = 300
         else:
@@ -147,7 +150,7 @@ if __name__ == '__main__':
             inputs_dict['attention_mask'] = text_mask.unsqueeze(0)
 
             scores = torch.zeros(1,82)
-            for model in models:
+            for i,model in enumerate(models):
                 pred_dict = model(inputs_dict)
                 scores += pred_dict['tagging_output_fusion']['predictions'].cpu()
             scores = scores/len(models)

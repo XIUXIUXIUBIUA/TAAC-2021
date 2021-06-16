@@ -81,7 +81,7 @@ class MultimodaFeaturesDataset(Dataset):
             dic[key] = ''.join(re.findall('[\u4e00-\u9fa5]',dic[key]))
             text += dic[key]
         
-        
+        # text = '[CLS]我是。[SEP]。。[SEP]'
         # text = ''.join(re.findall('[\u4e00-\u9fa5]',dic['video_asr']))
         inputs = self.tokenizer.encode_plus(
             text,
