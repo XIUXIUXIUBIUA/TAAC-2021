@@ -6,7 +6,7 @@
 ## torch 版本 baseline
 ### 使用方法
 1. init.sh 一键配置
-2. setup.sh 安装所需的包（建议在notebook中运行）
+2. 打开run.ipynb 运行前2个cell
 3. 运行命令，理论上能得到0.789左右的模型
 
 ```bash
