@@ -2,7 +2,9 @@
 - date: 2021-6-16
 - author: mafp
 - version: 2.0 正式版
-
+## 2021年腾讯广告算法大赛 
+- 初赛 rank 16
+- 复赛 rank 27
 ## torch 版本 baseline
 ### 使用方法
 1. init.sh 一键配置
